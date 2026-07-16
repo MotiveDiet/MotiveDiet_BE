@@ -1,15 +1,15 @@
 # API 명세서: MotiveDiet Backend
 
-**기준**: 홈(1b)/팩폭 메시지(1c)/코칭 설정(1d) 목업, `PRD.md`, `ROADMAP.md`
+**기준**: 홈(1b)/팩폭 메시지(1c)/코칭 설정(1d) 목업, `../product-specs/PRD.md`, `../exec-plans/ROADMAP-BE.md`
 **작성일**: 2026-07-14
 
-이 문서는 실제 요청/응답 스키마 수준의 명세다. 구현 순서·방식은 `ROADMAP.md`, 기능 배경은 `../PRD.md` 참고.
+이 문서는 실제 요청/응답 스키마 수준의 명세다. 구현 순서·방식은 `../exec-plans/ROADMAP-BE.md`, 기능 배경은 `../product-specs/PRD.md` 참고.
 
 모든 엔드포인트(로그인 제외)는 `Authorization: Bearer {JWT}` 헤더가 필요하다. 인증 실패는 `401`, 미동의(`consentedAt` null) 상태에서 코칭 관련 API 호출 시 `403`으로 통일한다.
 
 이번 스펙에서 확정한 것: **스트릭 달력의 "불꽃" 표시는 그날 음식 로그가 1건 이상 있었는지(출석 여부)로만 판정한다. 무엇을 먹었는지는 안 따진다.**  
 
-> 목업 1c 화면 상단 칩에 남아있는 "tier 2" 표기는 이전 설계의 흔적이다. tier 등급은 이미 폐기했으므로(`ROADMAP.md` Phase 3, 2026-07-14 결정) 실제 구현은 "이번 주 4회"만 쓰고 tier 숫자는 노출하지 않는다.
+> 목업 1c 화면 상단 칩에 남아있는 "tier 2" 표기는 이전 설계의 흔적이다. tier 등급은 이미 폐기했으므로(`../exec-plans/ROADMAP-BE.md` Phase 3, 2026-07-14 결정) 실제 구현은 "이번 주 4회"만 쓰고 tier 숫자는 노출하지 않는다.
 
 ---
 
@@ -37,7 +37,7 @@
 - `GET /api/oauth2/login/google`
 - `GET /api/oauth2/callback/google`
 
-`ROADMAP.md` Phase 0의 "iOS 콜백 대응" 작업(커스텀 URL 스킴 리다이렉트)은 아직 미반영 상태.
+`../exec-plans/ROADMAP-BE.md` Phase 0의 "iOS 콜백 대응" 작업(커스텀 URL 스킴 리다이렉트)은 아직 미반영 상태.
 
 ---
 
@@ -65,7 +65,7 @@ Response `200`
 { "goalWeight": 68.0, "goalDate": "2026-09-01" }
 ```
 
-내부적으로 `motiveText`는 파싱 후 폐기, `MotiveSignal` 저장(`ROADMAP.md` Phase 1 참고). 이 API는 응답에 원문/파싱 결과를 반환하지 않는다.
+내부적으로 `motiveText`는 파싱 후 폐기, `MotiveSignal` 저장(`../exec-plans/ROADMAP-BE.md` Phase 1 참고). 이 API는 응답에 원문/파싱 결과를 반환하지 않는다.
 
 ### `PATCH /api/users/me/consent`
 
@@ -171,7 +171,7 @@ Response `204`
 
 ### `POST /api/food-logs`
 
-원탭 로깅. 저장과 동시에 코칭 메시지를 생성해 같은 응답에 담아 반환한다 (`ROADMAP.md` Phase 2/3의 `generateCoachMessage` 참고).
+원탭 로깅. 저장과 동시에 코칭 메시지를 생성해 같은 응답에 담아 반환한다 (`../exec-plans/ROADMAP-BE.md` Phase 2/3의 `generateCoachMessage` 참고).
 
 Request: `{ "favoriteFoodId": 1 }`
 
