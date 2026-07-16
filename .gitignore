@@ -36,5 +36,12 @@ out/
 ### VS Code ###
 .vscode/
 .env
-.claude
-.CLAUDE.md
+
+### 에이전트 하네스 ###
+# .agents/(SoT), .claude/·.codex/(어댑터), .mcp.json(Generated) 은 커밋한다.
+# .mcp.json 은 생성물이지만 Claude 가 레포에서 직접 읽으므로 커밋해야 한다.
+# 개인 로컬 설정만 제외한다 — settings.local.json 에는 로컬 DB 비밀번호가 들어간다.
+.claude/settings.local.json
+.codex/*.local.*
+.agents/tasks/*
+!.agents/tasks/README.md

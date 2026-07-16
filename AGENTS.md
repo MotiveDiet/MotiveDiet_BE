@@ -25,8 +25,58 @@ MotiveDiet 백엔드에서 일하는 에이전트(Claude Code / Codex)의 진입
 | 무엇을 어떤 순서로 만드는지 | `docs/exec-plans/ROADMAP-BE.md` |
 | 프론트 작업 범위 (Phase 번호 공유) | `docs/exec-plans/ROADMAP-FE.md` |
 | 배포하다 터졌던 것들 + 재발 방지 | `docs/references/레일웨이_배포주의점.md` |
-| 코드 품질 기준 | `QUALITY_SCORE.md` |
+| 코드 품질 기준·머지 게이트 | `QUALITY_SCORE.md` |
 | 보안 규칙 | `SECURITY.md` |
+
+## 하네스 구조
+
+지식은 **도구 무관 SoT** 한 곳에 두고, 도구별 어댑터는 그걸 가리키기만 한다.
+같은 내용을 두 곳에 쓰면 반드시 드리프트한다 — 이 레포에서 이미 겪었다(README가 PRD 복사본이던 시절 결정 4·5번이 한쪽에서 누락됨).
+
+```
+AGENTS.md          루트 진입점 (지금 이 파일). 모든 도구 공통
+CLAUDE.md          → @AGENTS.md 포인터
+.agents/           도구 무관 SoT
+├── rules/         파일 경로에 매칭돼 자동 주입되는 행동 규칙
+├── skills/        SKILL.md 스펙. 어댑터로 심링크됨
+├── memory/        외부 시스템 포인터 인덱스 (현재 비어 있음 — README 참고)
+├── tasks/         휘발성 작업 상태 (현재 비어 있음 — README 참고)
+├── mcp/           MCP 정본 → .mcp.json / ~/.codex/config.toml 로 렌더링
+└── scripts/       어댑터 동기화
+.claude/           Claude Code 어댑터 (settings.json = 훅·권한, skills/ = 심링크)
+.codex/            Codex 어댑터 (AGENTS.md·skills/ = 심링크. .codex/README.md 참고)
+.mcp.json          Generated — 직접 고치지 말 것
+```
+
+**3분류 원칙:**
+
+| 분류 | 처리 | 예 |
+|---|---|---|
+| Portable | 심링크 | `.agents/skills/` → 두 어댑터 (모든 도구가 같은 포맷으로 읽음) |
+| Generated | 변환 스크립트 | MCP (Claude=JSON, Codex=TOML로 포맷이 다름) |
+| Agent-specific | 그대로 둠 | `.claude/settings.json` (훅·권한은 Claude 전용 개념) |
+
+**심링크 기준: 디렉토리 전체가 동일하고 포맷 변환이 불필요할 때만.**
+
+## 룰 자동 주입
+
+`.agents/rules/*.md` 는 frontmatter의 `paths:` 로 적용 범위를 지정한다. 한 룰은 60줄 이내.
+
+- **Claude Code**: `PreToolUse:Edit|Write` 훅이 수정 직전 경로에 매칭되는 룰을 자동 주입한다. 아무것도 안 해도 된다
+- **Codex**: 동등한 훅이 없다. 파일을 고치기 전에 직접 호출할 것 —
+  `.agents/scripts/codex-rule-hint.sh <파일경로>`
+
+둘 다 `.agents/scripts/rule-matcher.py` 하나를 공유한다. 두 도구가 서로 다른 규칙을 보게 만들지 않기 위함이다.
+
+## 스크립트
+
+| 스크립트 | 하는 일 | 언제 |
+|---|---|---|
+| `link-skills.sh` | `.agents/skills/` → 두 어댑터 심링크 정렬, stale 정리 | 스킬 추가·삭제 후 |
+| `sync-mcp.sh` | MCP 정본 → `.mcp.json` + `~/.codex/config.toml` | MCP 서버 변경 후 |
+| `sync-mcp.sh --check` | 쓰지 않고 차이만 보고 (exit 1 = 동기화 필요) | 검증 |
+| `rule-matcher.py` | 경로 ↔ 룰 매칭 (훅과 Codex가 공유) | 훅이 자동 호출 |
+| `codex-rule-hint.sh` | Codex용 룰 조회 | Codex가 파일 고치기 전 |
 
 ## 지뢰
 
