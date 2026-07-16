@@ -91,35 +91,18 @@ def gate_tests():
     return True, f"테스트 {total}건 통과 (스킵 {skipped})"
 
 
-SECRET_PATTERNS = [
-    (re.compile(r'(?i)(password|secret|token|api[_-]?key)\s*[:=]\s*["\']?(?!\$\{)[^\s"\'$}][^\s"\']{7,}'), "비밀값처럼 보이는 리터럴"),
-    (re.compile(r"GOCSPX-[A-Za-z0-9_-]{10,}"), "구글 클라이언트 시크릿"),
-    (re.compile(r"(?i)jdbc:mysql://(?!\$\{)[a-z0-9.-]+:\d+"), "하드코딩된 DB 접속 정보"),
-]
-
-
 def gate_secrets(files):
-    hits = []
-    for f in sorted(files):
-        path = os.path.join(ROOT, f)
-        if not os.path.isfile(path):
-            continue
-        # 추적되지 않는 파일은 커밋되지 않으므로 검사 대상이 아니다
-        if sh("git", "check-ignore", "-q", f).returncode == 0:
-            continue
-        try:
-            with open(path, encoding="utf-8", errors="ignore") as fh:
-                text = fh.read()
-        except OSError:
-            continue
-        for pat, label in SECRET_PATTERNS:
-            m = pat.search(text)
-            if m:
-                hits.append(f"{f}: {label}")
-                break
-    if hits:
-        return False, "비밀값 의심:\n  " + "\n  ".join(hits)
-    return True, "비밀값 없음"
+    """스캔 로직은 scan-secrets.py 하나를 CI 와 공유한다 — 두 곳이 다른 판정을 하지 않게."""
+    if not files:
+        return True, "검사할 파일 없음"
+    script = os.path.join(ROOT, ".agents", "scripts", "scan-secrets.py")
+    r = subprocess.run(
+        [sys.executable, script, "--files", *sorted(files)],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    if r.returncode == 0:
+        return True, "비밀값 없음"
+    return False, r.stdout.strip() or "비밀값 발견"
 
 
 def gate_schema(files):

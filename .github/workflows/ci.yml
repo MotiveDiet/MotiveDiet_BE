@@ -1,0 +1,69 @@
+# 결정적으로 검사할 수 있는 것은 컨텍스트가 아니라 여기서 강제한다.
+#
+# Stop 훅의 quality-gate.py 와 검사 항목이 겹치지만 역할이 다르다:
+#   - 게이트 : 에이전트가 턴을 끝내기 전. 빠른 피드백. 에이전트가 우회할 수 있다
+#   - CI     : 푸시 후. 느리지만 에이전트와 독립적이다. 우회 불가
+# 에이전트를 신뢰하지 않는 층이 하나는 있어야 한다.
+#
+# Railway 빌드는 `-x test` 로 테스트를 건너뛴다. 테스트를 실제로 돌리는 곳은 여기뿐이다.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          # .java-version 과 어긋나면 Railway 빌드와 다른 걸 검증하게 된다
+          java-version: '17'
+          distribution: temurin
+          cache: gradle
+
+      - name: 컴파일
+        run: ./gradlew compileJava compileTestJava
+
+      - name: 테스트
+        # CI 환경변수가 있으면 build.gradle 이 contextLoads() 를 제외한다 (DB 가 필요해서).
+        # 나머지는 전부 돌리므로 새로 추가되는 테스트도 자동으로 포함된다.
+        run: ./gradlew test
+
+      - name: 테스트가 실제로 실행됐는지 확인
+        # BUILD SUCCESSFUL 은 근거가 안 된다 — 스킵돼도 초록불이다
+        run: |
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          files = glob.glob("build/test-results/test/*.xml")
+          if not files:
+              sys.exit("실행된 테스트가 없다")
+          total = failed = 0
+          for f in files:
+              r = ET.parse(f).getroot()
+              total += int(r.get("tests", 0))
+              failed += int(r.get("failures", 0)) + int(r.get("errors", 0))
+          print(f"테스트 {total}건, 실패 {failed}건")
+          if total == 0:
+              sys.exit("실행된 테스트가 0건이다")
+          if failed:
+              sys.exit(f"테스트 실패 {failed}건")
+          PY
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 비밀값 스캔
+        # 에이전트가 게이트를 우회해도 여기서 잡힌다.
+        # 실제로 settings.local.json 에 로컬 DB 비밀번호가 들어가 있던 전례가 있다.
+        run: python3 .agents/scripts/scan-secrets.py --tracked

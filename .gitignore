@@ -45,3 +45,6 @@ out/
 .codex/*.local.*
 .agents/tasks/*
 !.agents/tasks/README.md
+### Python (스크립트 실행 부산물) ###
+__pycache__/
+*.pyc

@@ -40,4 +40,11 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+
+    // contextLoads() 는 전체 컨텍스트를 띄우며 실제 MySQL 을 요구한다. CI 에는 DB 가 없다.
+    // H2 를 붙이는 선택지는 버렸다 — prod 는 ddl-auto: validate 라 MySQL 스키마와 대조해야
+    // 의미가 있고, H2 로 통과시켜봐야 배포 시 validate 실패를 못 잡는다.
+    if (System.getenv('CI')) {
+        exclude '**/MotiveDietBeApplicationTests.class'
+    }
 }
