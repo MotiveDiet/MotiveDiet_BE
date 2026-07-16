@@ -8,6 +8,7 @@ import com.example.motivediet_be.jwt.TokenProvider;
 import com.example.motivediet_be.repository.UserRepository;
 import com.google.gson.Gson;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -17,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -48,12 +50,13 @@ public class AuthService {
         this.tokenProvider = tokenProvider;
     }
 
-    public String getGoogleLoginUrl() {
+    public String getGoogleLoginUrl(String state) {
         return UriComponentsBuilder.fromUriString(GOOGLE_AUTH_URL)
                 .queryParam("client_id", googleClientId)
                 .queryParam("redirect_uri", googleRedirectUri)
                 .queryParam("response_type", "code")
                 .queryParam("scope", GOOGLE_SCOPE)
+                .queryParam("state", state)
                 .build()
                 .toUriString();
     }
@@ -87,20 +90,43 @@ public class AuthService {
     public TokenDto loginOrSignUp(String googleAccessToken) {
         UserInfoDto userInfoDto = getUserInfo(googleAccessToken);
 
-        if (!userInfoDto.getVerifiedEmail()) {
+        if (!Boolean.TRUE.equals(userInfoDto.getVerifiedEmail())) {
             throw new RuntimeException("이메일 인증이 되지 않은 유저입니다.");
         }
 
-        User user = userRepository.findByEmail(userInfoDto.getEmail()).orElseGet(() ->
-                userRepository.save(User.builder()
-                        .email(userInfoDto.getEmail())
-                        .name(userInfoDto.getName())
-                        .pictureUrl(userInfoDto.getPictureUrl())
-                        .role(Role.ROLE_USER)
-                        .build())
-        );
+        if (!StringUtils.hasText(userInfoDto.getId())) {
+            throw new RuntimeException("구글 사용자 식별자가 없는 토큰입니다.");
+        }
+
+        User user = userRepository.findByGoogleId(userInfoDto.getId())
+                .orElseGet(() -> findOrCreateUser(userInfoDto));
 
         return tokenProvider.createToken(user);
+    }
+
+    private User findOrCreateUser(UserInfoDto userInfoDto) {
+        return userRepository.findByEmail(userInfoDto.getEmail())
+                .map(user -> {
+                    user.connectGoogleId(userInfoDto.getId());
+
+                    return userRepository.saveAndFlush(user);
+                })
+                .orElseGet(() -> saveNewUser(userInfoDto));
+    }
+
+    private User saveNewUser(UserInfoDto userInfoDto) {
+        try {
+            return userRepository.saveAndFlush(User.builder()
+                    .googleId(userInfoDto.getId())
+                    .email(userInfoDto.getEmail())
+                    .name(userInfoDto.getName())
+                    .pictureUrl(userInfoDto.getPictureUrl())
+                    .role(Role.ROLE_USER)
+                    .build());
+        } catch (DataIntegrityViolationException e) {
+            return userRepository.findByGoogleId(userInfoDto.getId())
+                    .orElseThrow(() -> e);
+        }
     }
 
     public UserInfoDto getUserInfo(String accessToken) {
@@ -130,4 +156,3 @@ public class AuthService {
                 .orElseThrow(() -> new RuntimeException("유저를 찾을 수 없습니다."));
     }
 }
-
