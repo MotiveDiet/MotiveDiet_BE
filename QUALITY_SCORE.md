@@ -6,16 +6,57 @@
 
 ---
 
-## 하드 게이트 — 하나라도 걸리면 머지 불가
+## 하드 게이트 — 자동 강제됨
 
-| # | 기준 | 확인 방법 |
-|---|---|---|
-| 1 | 컴파일된다 | `./gradlew compileJava compileTestJava` |
-| 2 | **테스트가 실제로 실행됐다** | `BUILD SUCCESSFUL`만으론 부족 — 스킵돼도 초록불이다. `build/test-results/test/*.xml`에서 `tests="N" failures="0"`을 눈으로 확인할 것 |
-| 3 | 비밀값이 코드·문서·커밋에 없다 | `SECURITY.md` 참고 |
-| 4 | 스키마를 바꿨다면 `schema-changes.sql`에 DDL이 있다 | 없으면 머지 즉시 프로덕션 기동 실패 |
-| 5 | 계약(요청/응답)을 바꿨다면 `docs/design-docs/API.md`가 갱신됐다 | 문서가 거짓말하면 FE가 깨진다 |
-| 6 | 비자명한 로직에 실행 가능한 체크가 하나 있다 | 분기·루프·파서·인증/보안 경로가 대상. 자명한 한 줄은 면제 |
+**이 문서는 글이 아니라 실행된다.** `Stop` 훅이 `.agents/scripts/quality-gate.py` 를 돌려
+아래를 검사하고, 하나라도 걸리면 **턴을 끝내지 못하게 차단한다.** 미완성 결과물이
+사용자에게 도달하지 않는다.
+
+`src/`, `build.gradle`, `settings.gradle` 이 안 바뀐 턴(문서만 고친 경우 등)은 게이트를 건너뛴다.
+
+| # | 기준 | 검사 방식 | 자동 |
+|---|---|---|---|
+| 1 | 컴파일된다 | `./gradlew compileJava compileTestJava --offline` | ✅ |
+| 2 | **테스트가 실제로 실행되고 통과했다** | `build/test-results/test/*.xml` 파싱. `BUILD SUCCESSFUL` 은 근거가 안 된다 — 스킵돼도 초록불이다 | ✅ |
+| 3 | 비밀값이 없다 | 변경 파일에서 비밀값 패턴 검색. gitignore 된 파일은 제외 | ✅ |
+| 4 | 스키마를 바꿨다면 DDL이 동반된다 | `**/domain/*.java` 변경 시 `schema-changes.sql` 존재 확인 | ✅ |
+| 5 | **Codex 교차 검증을 거쳤다** | `.agents/tasks/codex-review.json` 의 diff 해시와 현재 diff 비교 | ✅ |
+| 6 | 계약을 바꿨다면 `docs/design-docs/API.md` 갱신 | 자동 검사 불가 — 사람이 확인 | ❌ |
+| 7 | 비자명 로직에 실행 가능한 체크가 있다 | 자동 검사 불가 — 사람이 확인 | ❌ |
+
+수동 확인: `.agents/scripts/quality-gate.py --report`
+
+## 5번이 사이클을 강제한다
+
+Codex 검증 기록에는 **당시 diff 의 해시**가 들어간다. 검증 이후 코드를 한 줄이라도 고치면
+해시가 달라져 게이트가 다시 막는다 — "리뷰 받고 나서 조용히 고치기"를 방지한다.
+
+```bash
+# 1) Codex 에게 리뷰시킨다 (결론을 주지 마라 — 동조만 하고 교차 검증이 무의미해진다)
+codex exec -s workspace-write --add-dir ~/.gradle \
+  -c sandbox_workspace_write.network_access=true -C . -o /tmp/review.md "<중립적 리뷰 프롬프트>"
+
+# 2) 결과를 직접 검증한 뒤 기록한다
+.agents/scripts/mark-codex-review.sh 4 "state 누락, email 식별 등"
+```
+
+**기록만 남기고 실제로 안 돌리는 건 자기기만이다.** 게이트는 기록을 믿을 뿐 진위를 모른다.
+
+## 바이패스 모드 (아직 켜지 않음)
+
+게이트가 신뢰를 쌓으면 권한 프롬프트를 끄고 **최종 결과물만 확인**하는 방식으로 넘어간다.
+`.claude/settings.json` 에 추가:
+
+```json
+"permissions": { "defaultMode": "acceptEdits" }
+```
+
+더 나아가려면 `"bypassPermissions"` 지만, **그 순간 게이트가 유일한 안전장치가 된다.**
+켜기 전 조건:
+
+- 게이트 5개가 실제 작업 몇 사이클 동안 오탐·미탐 없이 돌았을 것
+- 6·7번(자동 검사 불가 항목)을 어떻게 담보할지 답이 있을 것
+- 되돌릴 방법이 있을 것 — `main` 푸시는 즉시 배포라 되돌리려면 또 배포해야 한다
 
 ## 코드 기준
 

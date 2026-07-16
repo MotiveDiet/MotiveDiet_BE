@@ -13,6 +13,18 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.agents/scripts/quality-gate.py\" 2>/dev/null || true",
+            "timeout": 180,
+            "statusMessage": "품질 게이트 검사 중"
+          }
+        ]
+      }
     ]
   }
 }

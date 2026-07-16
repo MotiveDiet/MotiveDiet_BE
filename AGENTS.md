@@ -77,6 +77,33 @@ CLAUDE.md          → @AGENTS.md 포인터
 | `sync-mcp.sh --check` | 쓰지 않고 차이만 보고 (exit 1 = 동기화 필요) | 검증 |
 | `rule-matcher.py` | 경로 ↔ 룰 매칭 (훅과 Codex가 공유) | 훅이 자동 호출 |
 | `codex-rule-hint.sh` | Codex용 룰 조회 | Codex가 파일 고치기 전 |
+| `quality-gate.py` | QUALITY_SCORE.md 하드 게이트 검사 | **Stop 훅이 자동 호출** |
+| `quality-gate.py --report` | 사람이 읽는 게이트 리포트 | 수동 확인 |
+| `mark-codex-review.sh` | Codex 교차 검증 완료 기록 | Codex 리뷰 직후 |
+
+## 게이트가 사이클을 강제한다
+
+**문서는 강제력이 없다.** AGENTS.md 에 사이클이 적혀 있어도 에이전트가 "이번엔 작으니 생략"
+하면 그만이다. 그래서 `Stop` 훅이 `quality-gate.py` 를 돌려 **턴을 끝내지 못하게 막는다.**
+
+```
+내가 턴을 끝내려 함
+      ↓
+Stop 훅 → quality-gate.py
+      ↓
+src/ 안 바뀌었나?  ──예──→  조용히 통과 (문서만 고친 턴)
+      │아니오
+      ↓
+① 컴파일  ② 테스트 실행+통과  ③ 비밀값  ④ 스키마/DDL  ⑤ Codex 교차 검증
+      ↓
+전부 통과? ──아니오──→  decision:block + 실패 이유 → 내가 다시 일함
+      │예
+      ↓
+사용자에게 결과물 도달
+```
+
+**⑤가 2중 검증 루프를 강제하는 지점이다.** 검증 기록에 당시 diff 해시가 들어가서, 리뷰 이후
+코드를 고치면 해시가 어긋나 다시 막힌다. 기준과 바이패스 모드 전환 조건은 `QUALITY_SCORE.md`.
 
 ## MCP 서버
 
