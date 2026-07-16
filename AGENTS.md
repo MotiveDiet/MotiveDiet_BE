@@ -78,6 +78,25 @@ CLAUDE.md          → @AGENTS.md 포인터
 | `rule-matcher.py` | 경로 ↔ 룰 매칭 (훅과 Codex가 공유) | 훅이 자동 호출 |
 | `codex-rule-hint.sh` | Codex용 룰 조회 | Codex가 파일 고치기 전 |
 
+## MCP 서버
+
+정본은 `.agents/mcp/servers.json`. 고친 뒤 반드시 `sync-mcp.sh` 를 돌린다.
+
+| 서버 | 용도 |
+|---|---|
+| `railway` | 배포 상태·로그·환경변수 조회 (`railway status`, `railway logs`) |
+| `playwright` | 브라우저 자동화. OAuth 로그인 흐름처럼 **실제로 태워봐야 검증되는 것** 확인용 |
+| `sequential-thinking` | 다단계 추론 보조 |
+
+**`~/.codex/config.toml` 의 railway 는 관리 밖이다.** `railway setup agent` 가 전역에 넣어둔 게 먼저 있어서, `sync-mcp.sh` 가 TOML 중복 키를 피하려고 건너뛴다. 동작에는 문제 없다 — 정본으로 관리하고 싶으면 그 항목을 지우고 다시 돌리면 된다.
+
+**서버를 추가하면 실제로 뜨는지 확인할 것.** 설정 파일이 맞다고 기동이 보장되지 않는다:
+
+```bash
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}' \
+  | npx @playwright/mcp@latest 2>/dev/null | head -c 500   # serverInfo 가 나오면 정상
+```
+
 ## 지뢰
 
 밟으면 프로덕션이 죽거나 되돌리기 어렵다. 작업 전 반드시 확인할 것.

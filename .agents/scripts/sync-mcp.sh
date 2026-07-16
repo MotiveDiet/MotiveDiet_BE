@@ -43,7 +43,8 @@ fi
 # ── Codex: ~/.codex/config.toml 에 managed 블록 머지 ──────────────────
 [ -f "$CODEX_OUT" ] || { echo "  Codex 설정 없음($CODEX_OUT) — 건너뜀"; exit 0; }
 
-# 우리 블록 밖에 같은 서버 키가 이미 있으면 중복 키로 TOML 이 깨진다. 덮지 말고 멈춘다.
+# 우리 블록 밖에 같은 서버 키가 이미 있으면 TOML 중복 키로 설정이 깨진다.
+# 충돌하는 서버만 건너뛰고 나머지는 동기화한다 — 하나 때문에 전부 막지 않는다.
 conflict="$(python3 - "$SRC" "$CODEX_OUT" "$BEGIN" "$END" <<'PY'
 import json, sys, re
 servers = json.load(open(sys.argv[1]))
@@ -57,17 +58,19 @@ PY
 )"
 
 if [ -n "$conflict" ]; then
-  echo "  ⚠️  Codex 설정에 관리 블록 밖에서 이미 정의된 서버가 있다: $conflict" >&2
-  echo "     그대로 넣으면 TOML 중복 키로 Codex 설정이 깨진다." >&2
-  echo "     ~/.codex/config.toml 에서 해당 [mcp_servers.*] 를 지운 뒤 다시 실행할 것." >&2
-  exit 1
+  echo "  ⚠️  건너뜀 — 관리 블록 밖에 이미 정의됨: $conflict" >&2
+  echo "     (그대로 넣으면 TOML 중복 키로 Codex 설정이 깨진다)" >&2
+  echo "     정본으로 관리하려면 ~/.codex/config.toml 에서 해당 [mcp_servers.*] 를 지우고 다시 실행할 것." >&2
 fi
 
 rendered_codex="$(python3 -c '
 import json, sys
 servers = json.load(open(sys.argv[1]))
+skip = set(x for x in sys.argv[2].split(",") if x)
 out = []
 for name, cfg in servers.items():
+    if name in skip:
+        continue
     out.append("[mcp_servers.%s]" % name)
     if "command" in cfg:
         out.append("command = %s" % json.dumps(cfg["command"]))
@@ -77,7 +80,12 @@ for name, cfg in servers.items():
         out.append("url = %s" % json.dumps(cfg["url"]))
     out.append("")
 print("\n".join(out).rstrip())
-' "$SRC")"
+' "$SRC" "$conflict")"
+
+if [ -z "$rendered_codex" ]; then
+  echo "  ~/.codex/config.toml: 동기화할 서버 없음 (전부 관리 블록 밖에 존재)"
+  exit 0
+fi
 
 block="$BEGIN
 $rendered_codex
