@@ -195,7 +195,7 @@ Response `201` — 팩폭/펀치라인이 뜨는 경우
 ```
 
 - `motiveCombo`는 유효한 동기 신호가 D-14 이내일 때만 존재, 아니면 필드 자체가 없음(`null` 아니라 생략 — 클라이언트가 `if (motiveCombo)`로만 체크하면 되게)
-- `toneType`은 `FACTBOMB` | `SAFE` | `NONE`(강도 OFF일 때 — 이 경우 `coachMessage` 자체가 `null`)
+- `toneType`은 `FACTBOMB` | `NONE`(강도 OFF일 때 — 이 경우 `coachMessage` 자체가 `null`). 안전 톤(`SAFE`)은 PRD 7-2 폐기로 제거됨
 - 목업 1c의 헤더 칩("치킨 · 이번 주 4회")은 `foodCategory.name` + `weeklyCount`로 구성. tier 숫자는 응답에 없음
 - "ㅋㅋ 인정" / "오늘만 봐줘" 버튼은 이번 스펙에서 백엔드 반응 저장 API를 만들지 않는다(단순 화면 닫기 동작으로 충분, PRD에 반응 수집 요구사항 없음) — 나중에 톤 튜닝용 피드백 수집이 필요해지면 별도 엔드포인트로 추가
 
@@ -241,5 +241,4 @@ Response `200`: 변경된 전체 설정 (5번 응답과 동일 형태)
 - `intensityLevel=OFF`면 `POST /api/food-logs`가 `coachMessage`를 아예 생성하지 않음(LLM 호출 스킵)
 - `frequencyLayerEnabled=false`면 `weeklyThreshold`를 넘겨도 프롬프트에 빈도 컨텍스트를 넣지 않음(단독/동기참조 팩폭만 가능)
 - `motiveComboEnabled=false`면 D-14 이내여도 D-day 카운트다운 문구를 프롬프트에 넣지 않음(`motiveCombo` 필드가 응답에 안 생김)
-- 안전 가드레일은 이 설정과 무관하게 항상 동작 (화면 1d 하단 문구와 동일한 정책)
 

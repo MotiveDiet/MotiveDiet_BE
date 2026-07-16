@@ -2,7 +2,7 @@
 
 **기준 문서**: ../PRD.md v0.1
 **작성일**: 2026-07-13
-**스택**: Spring Boot 4.1 (Java 17), Spring Data JPA + MySQL, Spring Security(Stateless) + jjwt, Lombok, Gson. LLM은 GPT-5 계열로 통일 — 파싱/안전 판정처럼 가볍고 빠른 판단이 필요한 작업은 `gpt-5-mini`, 팩폭·펀치라인처럼 톤이 중요한 생성 작업은 `gpt-5`. `OpenAiClient` 서비스 클래스 하나로 모든 LLM 호출을 처리 (벤더 하나, API 키 하나)
+**스택**: Spring Boot 4.1 (Java 17), Spring Data JPA + MySQL, Spring Security(Stateless) + jjwt, Lombok, Gson. LLM은 GPT-5 계열로 통일 — 파싱처럼 가볍고 빠른 판단이 필요한 작업은 `gpt-5-mini`, 팩폭·펀치라인처럼 톤이 중요한 생성 작업은 `gpt-5`. `OpenAiClient` 서비스 클래스 하나로 모든 LLM 호출을 처리 (벤더 하나, API 키 하나)
 
 프론트엔드는 `../MotiveDiet_FE/ROADMAP.md` 참고. Phase 번호는 두 로드맵 간에 동일하게 맞춰져 있다. 실제 요청/응답 스키마는 `API.md` 참고 — 이 파일은 "무엇을 만드는지" 체크리스트이고, `API.md`가 "어떤 형태로 주고받는지" 명세다.
 
@@ -23,7 +23,7 @@
 ## Phase 1 — 온보딩 & 핵심 로깅 MVP
 
 - [ ] **목표+동기 온보딩 API** — `PATCH /api/users/me/onboarding` (body: `goalWeight`, `goalDate`, `motiveText`). `User` 갱신과 아래 파싱 호출을 한 트랜잭션에서 실행
-- [ ] **OpenAiClient 서비스 클래스** — 이 프로젝트의 모든 LLM 호출(파싱/안전판정/팩폭/펀치라인, Phase 1~3)이 공용으로 쓰는 클라이언트. API 키는 `application.yml`에 보관, HTTP 호출은 기존 `AuthService`의 Google 연동과 동일하게 `RestTemplate`으로 POST (OpenAI Chat Completions/Responses API)
+- [ ] **OpenAiClient 서비스 클래스** — 이 프로젝트의 모든 LLM 호출(파싱/팩폭/펀치라인, Phase 1~3)이 공용으로 쓰는 클라이언트. API 키는 `application.yml`에 보관, HTTP 호출은 기존 `AuthService`의 Google 연동과 동일하게 `RestTemplate`으로 POST (OpenAI Chat Completions/Responses API)
 - [ ] **동기 파싱 파이프라인** — `motiveText`를 `OpenAiClient`로 `gpt-5-mini`에 전달(Structured Outputs로 JSON 스키마 `{motiveType, target, eventDate, paraphrase}` 강제) → 스키마가 이미 강제되므로 별도 파싱 라이브러리 없이 응답 그대로 `MotiveSignal`(userId, motiveType enum, target String, eventDate LocalDate, paraphrase String) 테이블에 저장. `motiveText` 원본은 이 메서드의 지역 변수로만 존재하고, DB/로그 어디에도 쓰지 않은 채 메서드 종료 시 폐기
 - [ ] **FoodCategory / 즐겨찾기 음식 슬롯** — `FoodCategory`(id, name, emoji, `weeklyThreshold` Int)는 `data.sql`로 고정 시드(예: 치킨 2, 햄버거 3, 라면 2, 빵 3, 술 2, 야식 2 — PRD 6.1). 이 테이블에 존재하는 것 자체가 "살찌는 음식" 화이트리스트이고, `weeklyThreshold`가 Phase 3 빈도 판정에 그대로 쓰임(tier 등급 없이 카테고리당 숫자 하나). `FavoriteFood`(userId, foodCategoryId, slotOrder 0~4)로 3~5개 슬롯 관리. `GET /api/food-categories`, `POST/PUT/DELETE /api/favorite-foods` CRUD (`API.md` 4절)
 - [ ] **즐겨찾기 원탭 로깅 API** — `POST /api/food-logs {favoriteFoodId}` → `FoodLog`(userId, foodCategoryId, loggedAt=now) insert. 팩폭 결과(Phase 2)를 같은 응답 body에 동기로 포함해 왕복을 줄임
@@ -38,7 +38,6 @@
 
 - [ ] **동기 연동 팩폭 생성** — `generateCoachMessage(FoodLog)` 신설. `OpenAiClient`로 `gpt-5`를 호출하며 프롬프트는 아래 규칙으로 조합: (1) 로깅된 `FoodCategory.name`은 항상 포함 (2) 콘텐츠 가이드라인 4개 규칙(아래)은 항상 포함 (3) 유효한 `MotiveSignal`이 있으면 `target`/`paraphrase`를 포함하고, `eventDate`가 오늘부터 0~14일 이내면 D-day 카운트다운도 추가로 포함 → 응답 문장을 `POST /api/food-logs` 응답에 포함
   - 콘텐츠 가이드라인(시스템 프롬프트에 고정 삽입): (a) 외모·체중·능력 인신공격 금지, 행동(식습관)에 대한 유머만 (b) 자해·자살·섭식장애 언급 금지 (c) 특정 집단 비하 금지 (d) 욕설·혐오 표현 금지
-- [ ] **안전 가드레일** — 2단계 파이프라인. (1) `motiveText`를 자해·자살·섭식장애 키워드 정규식 리스트(`SafetyKeyword` 테이블 또는 `application.yml`)로 1차 매칭 → 매칭 시 즉시 안전 톤. (2) 매칭 안 됐지만 애매하면 `OpenAiClient`로 `gpt-5-mini`에 별도 분류 프롬프트("이 텍스트가 위험 신호인지 JSON `{risk, confidence}`로 답하라", Structured Outputs로 스키마 강제) 호출, `confidence < 0.7`이면 예외 없이 안전 톤 처리. 안전 톤일 때는 팩폭 생성 호출 자체를 건너뛰고 고정 안전 문구 세트 중 하나를 반환
 - [ ] **코칭 설정 API** — `User`에 `intensityLevel`(enum: OFF/MILD/MEDIUM/STRONG, 기본 MILD), `frequencyLayerEnabled`(Boolean, 기본 true), `motiveComboEnabled`(Boolean, 기본 true) 컬럼 추가. `GET/PATCH /api/users/me/coaching-settings` (`API.md` 6절, 화면 1d의 강도 4단계 + 메시지 레이어 토글 2개에 대응). `intensityLevel=OFF`면 `generateCoachMessage`가 LLM 호출 자체를 스킵, `frequencyLayerEnabled=false`면 빈도 컨텍스트를 프롬프트에서 제외, `motiveComboEnabled=false`면 D-day 카운트다운을 프롬프트에서 제외. 잠금화면 노출 토글은 응답에 `lockScreenEnabled: false` 고정값만 내려주고 PATCH 대상에서 제외(정책상 항상 꺼짐)
 - [ ] **opt-in 동의 저장 API** — `User.consentedAt`(Timestamp, nullable) 컬럼, `PATCH /api/users/me/consent`가 `now()` 저장. `consentedAt`이 null이면 팩폭/펀치라인 관련 API가 403을 반환하도록 공통 인터셉터에서 체크
 
@@ -50,7 +49,6 @@
 
 - [ ] **빈도 판정** — `FoodLog` 저장 시 `SELECT COUNT(*) FROM food_log WHERE user_id=? AND food_category_id=? AND logged_at >= NOW() - INTERVAL 7 DAY`로 이번 주 카운트 산출 → `count >= FoodCategory.weeklyThreshold`인지만 확인 (몇 번째로 넘었는지 따질 필요 없음, 매번 같은 조건 재확인)
 - [ ] **`generateCoachMessage` 확장** — 위 조건이 참이면 Phase 2 프롬프트 조합 규칙에 `{음식명, 이번 주 실제 카운트}`를 추가. 거짓이면 Phase 2의 기본형(동기 컨텍스트만) 그대로 사용. 결과적으로 한 메서드가 "단독 팩폭 / 동기 참조 팩폭 / 빈도 펀치라인 / 동기+빈도 콤보" 네 가지를 프롬프트 조건 조합만으로 커버
-- [ ] **안전 톤 강제 전환** — Phase 2의 안전 가드레일 체크는 이미 `generateCoachMessage` 진입 전에 실행되므로, 이 Phase에서 별도로 다시 체크할 필요 없음 (같은 메서드이기 때문)
 - [ ] **잠금화면 알림 노출 금지** — 이 메시지들은 애초에 push 발송 로직을 타지 않고 `POST /api/food-logs` 응답 body로만 반환 (별도 알림 채널을 만들지 않음)
 
 ---
