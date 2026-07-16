@@ -14,6 +14,9 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "USER_GOOGLE_ID", unique = true)
+    private String googleId;
+
     @Column(name = "USER_NAME", nullable = false)
     private String name;
 
@@ -26,4 +29,16 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "USER_ROLE", nullable = false)
     private Role role;
+
+    public void connectGoogleId(String googleId) {
+        if (this.googleId == null) {
+            this.googleId = googleId;
+
+            return;
+        }
+
+        if (!this.googleId.equals(googleId)) {
+            throw new RuntimeException("이미 다른 구글 계정과 연결된 유저입니다.");
+        }
+    }
 }

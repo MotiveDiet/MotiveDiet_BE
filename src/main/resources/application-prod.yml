@@ -1,3 +1,8 @@
+server:
+  # Railway가 TLS를 엣지에서 끊고 컨테이너로는 http로 넘기므로,
+  # X-Forwarded-* 를 신뢰해야 request.isSecure()가 true가 된다 (OAuth state 쿠키의 Secure 판정에 사용)
+  forward-headers-strategy: framework
+
 spring:
   datasource:
     url: ${DB_URL}

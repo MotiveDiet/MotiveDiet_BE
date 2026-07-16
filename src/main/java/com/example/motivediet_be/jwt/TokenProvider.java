@@ -2,6 +2,7 @@ package com.example.motivediet_be.jwt;
 
 import com.example.motivediet_be.domain.User;
 import com.example.motivediet_be.dto.TokenDto;
+import com.example.motivediet_be.repository.UserRepository;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -25,12 +26,15 @@ public class TokenProvider {
 
     private final SecretKey key;
     private final long accessTokenValidityTime;
+    private final UserRepository userRepository;
 
     public TokenProvider(@Value("${jwt.secret}") String secretKey,
-                         @Value("${jwt.access-token-validity-in-milliseconds}") long accessTokenValidityTime) {
+                         @Value("${jwt.access-token-validity-in-milliseconds}") long accessTokenValidityTime,
+                         UserRepository userRepository) {
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         this.key = Keys.hmacShaKeyFor(keyBytes);
         this.accessTokenValidityTime = accessTokenValidityTime;
+        this.userRepository = userRepository;
     }
 
     public TokenDto createToken(User user) {
@@ -53,11 +57,14 @@ public class TokenProvider {
     public Authentication getAuthentication(String accessToken) {
         Claims claims = parseClaims(accessToken);
 
-        if (claims.get("auth") == null) {
-            throw new RuntimeException("권한 정보가 없는 토큰입니다.");
+        User user = userRepository.findById(Long.parseLong(claims.getSubject()))
+                .orElse(null);
+
+        if (user == null) {
+            return null;
         }
 
-        Collection<? extends GrantedAuthority> authorities = Arrays.stream(claims.get("auth").toString().split(","))
+        Collection<? extends GrantedAuthority> authorities = Arrays.stream(user.getRole().name().split(","))
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toList());
 
