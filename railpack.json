@@ -1,0 +1,5 @@
+{
+  "deploy": {
+    "startCommand": "java $JAVA_OPTS -jar -Dserver.port=$PORT $(ls -1 build/libs/*jar | grep -v plain)"
+  }
+}
