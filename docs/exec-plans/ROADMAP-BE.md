@@ -15,8 +15,8 @@
 - [x] 회원가입/로그인 — Google OAuth2 인가 코드 방식. `GET /api/oauth2/login/google`이 구글 동의 화면으로 리다이렉트 → `GET /api/oauth2/callback/google`이 `code`를 access token으로 교환 → 이메일로 `User` 조회, 없으면 생성 → JWT 발급
 - [x] JWT 발급/검증 — `TokenProvider`(jjwt 0.12.6)가 서명, `JwtFilter`가 `Authorization: Bearer` 헤더를 읽어 `SecurityContext`에 세팅
 - [x] SecurityConfig — Stateless 세션, `/api/oauth2/**`만 `permitAll`, 나머지는 JWT 필요
-- [ ] **사용자 프로필 확장** — `User` 엔티티에 `goalWeight`(Double), `goalDate`(LocalDate) 컬럼 추가, JPA `ddl-auto`로 스키마 반영
-- [ ] **iOS 콜백 대응** — 현재 `/api/oauth2/callback/google`이 `TokenDto`를 JSON으로 바로 반환하는데, iOS는 `ASWebAuthenticationSession`(웹뷰)으로 이 흐름을 타기 때문에 JSON 응답을 앱이 받을 방법이 없음. 콜백 성공 시 커스텀 URL 스킴(`motivediet://auth?token=...`)으로 302 리다이렉트하도록 `AuthController.googleCallback` 수정 필요 (FE Phase 0 로그인 화면의 전제조건)
+- [x] **사용자 프로필 확장** — `User` 엔티티에 `goalWeight`(Double), `goalDate`(LocalDate) 컬럼 추가. 둘 다 nullable, DDL은 `schema-changes.sql`에 누적(prod는 `ddl-auto: validate`라 자동 반영되지 않는다 — 머지 전 수동 DDL 선행)
+- [x] **iOS 콜백 대응** — `/api/oauth2/callback/google`이 `TokenDto` JSON 대신 커스텀 URL 스킴(`motivediet://auth?token=...`)으로 302 리다이렉트. iOS는 `ASWebAuthenticationSession`(웹뷰)으로 이 흐름을 타기 때문에 JSON 응답을 앱이 받을 방법이 없음 (FE Phase 0 로그인 화면의 전제조건)
 
 ---
 

@@ -32,12 +32,10 @@
 
 
 
-## 1. 인증 (기존 구현됨, 변경 없음)
+## 1. 인증
 
-- `GET /api/oauth2/login/google`
-- `GET /api/oauth2/callback/google`
-
-`../exec-plans/ROADMAP-BE.md` Phase 0의 "iOS 콜백 대응" 작업(커스텀 URL 스킴 리다이렉트)은 아직 미반영 상태.
+- `GET /api/oauth2/login/google` — 구글 동의 화면으로 `302`
+- `GET /api/oauth2/callback/google` — 성공 시 `motivediet://auth?token={JWT}` 로 `302`. JSON 본문을 반환하지 않는다(iOS `ASWebAuthenticationSession` 이 웹뷰라 본문을 앱이 받을 수 없어, 커스텀 URL 스킴 리다이렉트가 토큰 전달 경로다). `state` 불일치는 `400`
 
 ---
 
