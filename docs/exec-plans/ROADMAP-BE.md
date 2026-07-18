@@ -22,13 +22,13 @@
 
 ## Phase 1 — 온보딩 & 핵심 로깅 MVP
 
-- [ ] **목표+동기 온보딩 API** — `PATCH /api/users/me/onboarding` (body: `goalWeight`, `goalDate`, `motiveText`). `User` 갱신과 아래 파싱 호출을 한 트랜잭션에서 실행
-- [ ] **OpenAiClient 서비스 클래스** — 이 프로젝트의 모든 LLM 호출(파싱/팩폭/펀치라인, Phase 1~3)이 공용으로 쓰는 클라이언트. API 키는 `application.yml`에 보관, HTTP 호출은 기존 `AuthService`의 Google 연동과 동일하게 `RestTemplate`으로 POST (OpenAI Chat Completions/Responses API)
-- [ ] **동기 파싱 파이프라인** — `motiveText`를 `OpenAiClient`로 `gpt-5-mini`에 전달(Structured Outputs로 JSON 스키마 `{motiveType, target, eventDate, paraphrase}` 강제) → 스키마가 이미 강제되므로 별도 파싱 라이브러리 없이 응답 그대로 `MotiveSignal`(userId, motiveType enum, target String, eventDate LocalDate, paraphrase String) 테이블에 저장. `motiveText` 원본은 이 메서드의 지역 변수로만 존재하고, DB/로그 어디에도 쓰지 않은 채 메서드 종료 시 폐기
-- [ ] **FoodCategory / 즐겨찾기 음식 슬롯** — `FoodCategory`(id, name, emoji, `weeklyThreshold` Int)는 `data.sql`로 고정 시드(예: 치킨 2, 햄버거 3, 라면 2, 빵 3, 술 2, 야식 2 — PRD 6.1). 이 테이블에 존재하는 것 자체가 "살찌는 음식" 화이트리스트이고, `weeklyThreshold`가 Phase 3 빈도 판정에 그대로 쓰임(tier 등급 없이 카테고리당 숫자 하나). `FavoriteFood`(userId, foodCategoryId, slotOrder 0~4)로 3~5개 슬롯 관리. `GET /api/food-categories`, `POST/PUT/DELETE /api/favorite-foods` CRUD (`../design-docs/API.md` 4절)
-- [ ] **즐겨찾기 원탭 로깅 API** — `POST /api/food-logs {favoriteFoodId}` → `FoodLog`(userId, foodCategoryId, loggedAt=now) insert. 팩폭 결과(Phase 2)를 같은 응답 body에 동기로 포함해 왕복을 줄임
-- [ ] **살찌는 음식 판정 로직** — 별도 로직 없음. `FoodLog.foodCategoryId`가 `FoodCategory`(화이트리스트)에 존재하면 그 자체로 "살찌는 음식"으로 취급
-- [ ] **홈 대시보드 API** — `GET /api/home` (`../design-docs/API.md` 3절). 동기 신호 칩, 이번 주 월~일 로그 유무(`EXISTS` 쿼리 7번 또는 `IN` 한 방 쿼리 후 날짜별로 그룹핑), 연속일수(`currentStreakDays`), 즐겨찾기 슬롯+주간 카운트를 한 응답으로 묶음. **"불꽃" 판정 기준은 그날 `FoodLog`가 1건 이상 있는지(출석 여부)뿐 — 무엇을 먹었는지는 안 따짐**. 별도 스트릭 테이블 없이 매 요청마다 `FoodLog`에서 즉석 계산(로그 삭제/수정 시 동기화 문제를 피하려고)
+- [x] **목표+동기 온보딩 API** — `PATCH /api/users/me/onboarding` (body: `goalWeight`, `goalDate`, `motiveText`). `User` 갱신과 아래 파싱 호출을 한 트랜잭션에서 실행
+- [x] **OpenAiClient 서비스 클래스** — 이 프로젝트의 모든 LLM 호출(파싱/팩폭/펀치라인, Phase 1~3)이 공용으로 쓰는 클라이언트. API 키는 `application.yml`에 보관, HTTP 호출은 기존 `AuthService`의 Google 연동과 동일하게 `RestTemplate`으로 POST (OpenAI Chat Completions/Responses API)
+- [x] **동기 파싱 파이프라인** — `motiveText`를 `OpenAiClient`로 `gpt-5-mini`에 전달(Structured Outputs로 JSON 스키마 `{motiveType, target, eventDate, paraphrase}` 강제) → 스키마가 이미 강제되므로 별도 파싱 라이브러리 없이 응답 그대로 `MotiveSignal`(userId, motiveType enum, target String, eventDate LocalDate, paraphrase String) 테이블에 저장. `motiveText` 원본은 이 메서드의 지역 변수로만 존재하고, DB/로그 어디에도 쓰지 않은 채 메서드 종료 시 폐기
+- [x] **FoodCategory / 즐겨찾기 음식 슬롯** — `FoodCategory`(id, name, emoji, `weeklyThreshold` Int)는 `data.sql`로 고정 시드(예: 치킨 2, 햄버거 3, 라면 2, 빵 3, 술 2, 야식 2 — PRD 6.1). 이 테이블에 존재하는 것 자체가 "살찌는 음식" 화이트리스트이고, `weeklyThreshold`가 Phase 3 빈도 판정에 그대로 쓰임(tier 등급 없이 카테고리당 숫자 하나). `FavoriteFood`(userId, foodCategoryId, slotOrder 0~4)로 3~5개 슬롯 관리. `GET /api/food-categories`, `POST/PUT/DELETE /api/favorite-foods` CRUD (`../design-docs/API.md` 4절)
+- [x] **즐겨찾기 원탭 로깅 API** — `POST /api/food-logs {favoriteFoodId}` → `FoodLog`(userId, foodCategoryId, loggedAt=now) insert. 팩폭 결과(Phase 2)를 같은 응답 body에 동기로 포함해 왕복을 줄임
+- [x] **살찌는 음식 판정 로직** — 별도 로직 없음. `FoodLog.foodCategoryId`가 `FoodCategory`(화이트리스트)에 존재하면 그 자체로 "살찌는 음식"으로 취급
+- [x] **홈 대시보드 API** — `GET /api/home` (`../design-docs/API.md` 3절). 동기 신호 칩, 이번 주 월~일 로그 유무(`EXISTS` 쿼리 7번 또는 `IN` 한 방 쿼리 후 날짜별로 그룹핑), 연속일수(`currentStreakDays`), 즐겨찾기 슬롯+주간 카운트를 한 응답으로 묶음. **"불꽃" 판정 기준은 그날 `FoodLog`가 1건 이상 있는지(출석 여부)뿐 — 무엇을 먹었는지는 안 따짐**. 별도 스트릭 테이블 없이 매 요청마다 `FoodLog`에서 즉석 계산(로그 삭제/수정 시 동기화 문제를 피하려고)
 
 ---
 

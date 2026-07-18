@@ -146,7 +146,8 @@ Response `200`
 Request: `{ "foodCategoryId": 15 }`
 
 Response `201`: `{ "favoriteFoodId": 6, "foodCategoryId": 15, "name": "떡볶이", "emoji": "🌶️", "weeklyCount": 0, "slotOrder": 4 }`
-Response `400`: 이미 5개 슬롯이 꽉 찼을 때 `{ "error": "FAVORITE_SLOT_FULL" }`
+Response `400`: 이미 5개 슬롯이 꽉 찼을 때 `{ "error": "FAVORITE_SLOT_FULL" }`, 없는 카테고리면 `{ "error": "INVALID_FOOD_CATEGORY" }`
+Response `404`: 남의/없는 슬롯을 PUT/DELETE 할 때 `{ "error": "FAVORITE_NOT_FOUND" }` (POST 제외)
 
 ### `PUT /api/favorite-foods/{favoriteFoodId}`
 
@@ -170,6 +171,8 @@ Response `204`
 ### `POST /api/food-logs`
 
 원탭 로깅. 저장과 동시에 코칭 메시지를 생성해 같은 응답에 담아 반환한다 (`../exec-plans/ROADMAP-BE.md` Phase 2/3의 `generateCoachMessage` 참고).
+
+> **Phase 1 현재 구현**: 로깅 저장 + `weeklyCount` 까지만 반환하고 `coachMessage` 필드는 아직 없다(팩폭 생성은 Phase 2). 미동의 403(`CONSENT_REQUIRED`)도 Phase 2에서 추가된다.
 
 Request: `{ "favoriteFoodId": 1 }`
 

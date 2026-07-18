@@ -38,6 +38,11 @@ public class User {
     @Column(name = "USER_GOAL_DATE")
     private LocalDate goalDate;
 
+    public void updateOnboarding(Double goalWeight, LocalDate goalDate) {
+        this.goalWeight = goalWeight;
+        this.goalDate = goalDate;
+    }
+
     public void connectGoogleId(String googleId) {
         if (this.googleId == null) {
             this.googleId = googleId;
