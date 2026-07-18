@@ -9,20 +9,31 @@
 
 **이 디렉토리의 파일을 직접 고치지 마라.** 심링크라서 원본이 바뀐다.
 
-## Codex 실행 공식
+## Codex 실행
 
-기본 샌드박스로는 Gradle이 돌지 않아 Codex가 자기 수정을 검증하지 못한다:
+**직접 `codex exec` 를 치지 마라.** 스크립트를 쓴다:
 
 ```bash
-codex exec -s workspace-write \
-  --add-dir ~/.gradle \
-  -c sandbox_workspace_write.network_access=true \
-  -C . -o <출력파일> "<프롬프트>"
+.agents/scripts/codex-review.sh "<리뷰 프롬프트>"
 ```
 
-- `--add-dir ~/.gradle` — Gradle 캐시·락이 워크스페이스 밖이라 쓰기 허용 필요
-- `network_access=true` — `FileLockContentionHandler`가 **로컬 소켓**을 열어야 함. 인터넷이 필요한 게 아니므로 Gradle엔 `--offline`을 같이 줄 것
-- `-o <파일>` — Codex 출력이 Claude 컨텍스트로 되돌아오며 과금되므로 파일로 받는다
+플래그를 문서에 적어두면 지켜지는지 확인할 방법이 없다. 실제로 `-s read-only` 로 돌리면
+Codex 가 자기 수정을 검증하지 못하는데도 게이트는 리뷰 기록의 존재만 보고 통과시킨다.
+스크립트가 실행하면 플래그가 산문이 아니라 코드가 된다. 근거는 스크립트 주석에 있다.
+
+스크립트가 하는 일: 올바른 플래그로 Codex 실행 → 출력을 파일로 수신(컨텍스트 절약)
+→ `.agents/reviews/<코드해시>.md` 로 기록 → 게이트/CI 가 그 기록을 확인.
+
+### 기본 샌드박스로는 Gradle 이 돌지 않는다
+
+`--add-dir ~/.gradle` 없이 돌리면 Gradle 이 락 파일을 못 쓴다. 그것만 풀면 이번엔
+`FileLockContentionHandler` 가 **로컬 소켓**을 못 열어 `SocketException: Operation not permitted`
+로 죽는다 — 인터넷이 필요한 게 아니라 로컬 소켓 때문이라, `network_access=true` 를 주되
+Gradle 에는 `--offline` 을 같이 줘서 실제 외부 통신은 막는다. (2026-07-16 실측)
+
+**주의**: 여기서 말하는 `~/.gradle` 은 **홈 디렉토리의 Gradle 전역 캐시**(약 1GB, 이 머신의
+모든 프로젝트가 공유)다. 레포 안의 `.gradle/` 과는 다른 것이고, 그건 Codex 와 무관하다 —
+IntelliJ 든 CI 든 Gradle 을 돌리면 생기는 로컬 캐시이며 gitignore 돼 있다.
 
 ## Claude와 다른 점 두 가지
 
