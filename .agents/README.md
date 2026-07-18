@@ -55,13 +55,19 @@
 
 | 스크립트 | 하는 일 | 언제 |
 |---|---|---|
+| `codex-review.sh "<프롬프트>"` | **Codex 교차 검증 실행 + 기록** (3단계) | 코드를 고쳤을 때 |
 | `quality-gate.py` | 하드 게이트 검사 (`QUALITY_SCORE.md`) | **Stop 훅이 자동 호출** |
 | `quality-gate.py --report` | 사람이 읽는 리포트 | 수동 |
-| `mark-codex-review.sh <건수>` | Codex 교차 검증 기록 | Codex 리뷰 직후 |
+| `check-review.py --verify` | 교차 검증 기록 확인 (게이트·CI 공유) | 자동 |
+| `scan-secrets.py --tracked` | 비밀값 스캔 (게이트·CI 공유) | 자동 |
 | `rule-matcher.py` | 경로 ↔ 룰 매칭 | 훅이 자동 호출 |
 | `codex-rule-hint.sh <파일>` | Codex용 룰 조회 | Codex가 고치기 전 |
 | `link-skills.sh` | 스킬 심링크 정렬·stale 정리 | 스킬 추가·삭제 후 |
 | `sync-mcp.sh [--check]` | MCP 정본 → 두 도구 설정 | MCP 변경 후 |
+
+**절차를 문서에 적지 말고 스크립트로 만들어라.** "이렇게 치라"고 적힌 명령은 지켜지는지
+확인할 방법이 없다 — 실제로 Codex 실행 플래그가 README 에만 있어서, 잘못된 플래그로
+돌려도 게이트가 통과시키는 상태였다. 스크립트가 실행하면 플래그가 코드가 된다.
 
 ## 2중 검증 루프
 
@@ -103,9 +109,6 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
 ```
 
 ## 하네스 자체를 정기적으로 점검할 것
-
-하네스는 방치하면 살찐다. 실제로 하루 만에 `AGENTS.md` 가 216줄까지 불었고,
-`coding-conventions.md` 는 상위 `CLAUDE.md` 를 한국어로 번역해 다시 쓴 중복이었다.
 
 주기적으로 확인:
 

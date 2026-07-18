@@ -41,10 +41,15 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 
-    // contextLoads() 는 전체 컨텍스트를 띄우며 실제 MySQL 을 요구한다. CI 에는 DB 가 없다.
+    // contextLoads() 는 전체 컨텍스트를 띄우며 실제 MySQL 을 요구한다.
+    // 조건을 'CI 인가'가 아니라 'DB 가 있는가'로 잡는다 — 그게 이 테스트의 실제 의존성이고,
+    // CI 든 로컬이든 DB_URL 이 없으면 똑같이 못 돈다. CI 만 특별 취급하면 로컬 게이트가
+    // 상시 빨간불이 되고, 그러면 아무도 게이트를 안 본다.
+    // DB_URL 만 있고 JWT_SECRET 등이 없으면 이 테스트가 켜졌다가 실패하지만, 그때는
+    // "무엇이 없는지"가 그대로 찍히므로 조건을 더 정교하게 만들지 않았다 (2026-07-16 판단).
     // H2 를 붙이는 선택지는 버렸다 — prod 는 ddl-auto: validate 라 MySQL 스키마와 대조해야
     // 의미가 있고, H2 로 통과시켜봐야 배포 시 validate 실패를 못 잡는다.
-    if (System.getenv('CI')) {
+    if (!System.getenv('DB_URL')) {
         exclude '**/MotiveDietBeApplicationTests.class'
     }
 }

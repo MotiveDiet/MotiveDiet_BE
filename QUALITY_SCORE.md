@@ -12,29 +12,36 @@
 아래를 검사하고, 하나라도 걸리면 **턴을 끝내지 못하게 차단한다.** 미완성 결과물이
 사용자에게 도달하지 않는다.
 
-`src/`, `build.gradle`, `settings.gradle` 이 안 바뀐 턴(문서만 고친 경우 등)은 게이트를 건너뛴다.
+검사 대상 경로(`check-review.py` 의 `CODE_PATHS`)가 안 바뀐 턴은 게이트를 건너뛴다.
+애플리케이션 코드뿐 아니라 **검사를 무력화할 수 있는 것**이 전부 포함된다 — `.agents/scripts/`,
+`.github/workflows/`, `gradlew`. 앱 코드만 대상으로 하면 검사 장치를 고쳐서 우회할 수 있다.
 
-| # | 기준 | 검사 방식 | 자동 |
-|---|---|---|---|
-| 1 | 컴파일된다 | `./gradlew compileJava compileTestJava --offline` | ✅ |
-| 2 | **테스트가 실제로 실행되고 통과했다** | `build/test-results/test/*.xml` 파싱. `BUILD SUCCESSFUL` 은 근거가 안 된다 — 스킵돼도 초록불이다 | ✅ |
-| 3 | 비밀값이 없다 | 변경 파일에서 비밀값 패턴 검색. gitignore 된 파일은 제외 | ✅ |
-| 4 | 스키마를 바꿨다면 DDL이 동반된다 | `**/domain/*.java` 변경 시 `schema-changes.sql` 존재 확인 | ✅ |
-| 5 | **Codex 교차 검증을 거쳤다** | `.agents/tasks/codex-review.json` 의 diff 해시와 현재 diff 비교 | ✅ |
-| 6 | 계약을 바꿨다면 `docs/design-docs/API.md` 갱신 | 자동 검사 불가 — 사람이 확인 | ❌ |
-| 7 | 비자명 로직에 실행 가능한 체크가 있다 | 자동 검사 불가 — 사람이 확인 | ❌ |
+| # | 기준 | 검사 방식 | 게이트 | CI |
+|---|---|---|---|---|
+| 1 | 컴파일된다 | `./gradlew compileJava compileTestJava` (offline 먼저, 실패 시 online 재시도) | ✅ | ✅ |
+| 2 | **테스트가 실행되고 통과했다** | `build/test-results/test/*.xml` 파싱. `BUILD SUCCESSFUL` 은 근거가 안 된다(스킵돼도 초록불). XML 이 코드보다 낡았으면 다시 돌린다 | ✅ | ✅ |
+| 3 | 비밀값이 없다 | `scan-secrets.py` (게이트·CI 공유) | ✅ | ✅ |
+| 4 | 스키마를 바꿨다면 DDL 동반 | `**/domain/*.java` 변경 시 `schema-changes.sql` 확인 | ✅ | ✅ |
+| 5 | **Codex 교차 검증을 거쳤다** | `check-review.py` — `.agents/reviews/<코드해시>.md` 존재 확인 (게이트·CI 공유) | ✅ | ✅ |
+| 6 | 계약을 바꿨다면 API.md 갱신 | controller/dto 변경 시 `API.md` 동반 확인. **로컬 전용** — "계약이 실제로 바뀌었나"는 기계가 판정 못 한다(순수 리팩터링도 있다). CI 로 올리면 가짜 수정을 강요하게 된다. 탈출구: `touch .agents/tasks/skip-api-doc` | ✅ | ❌ |
+| 7 | 테스트가 적절한가 | **기계화 불가.** "이 테스트가 충분한가"는 판단이다. 실제로 `AuthControllerStateTest` 가 초록불인데 프로덕션이 깨져 있었다 — 이 질문의 답은 5번(Codex 교차 검증)이 맡는다 | — | — |
 
 수동 확인: `.agents/scripts/quality-gate.py --report`
 
 ## 5번이 사이클을 강제한다
 
-Codex 검증 기록에는 **당시 diff 의 해시**가 들어간다. 검증 이후 코드를 한 줄이라도 고치면
-해시가 달라져 게이트가 다시 막는다 — "리뷰 받고 나서 조용히 고치기"를 방지한다.
+`.agents/reviews/<코드해시>.md` 에 **Codex 의 실제 출력이 통째로** 커밋된다. 마커가 아니라
+출력을 저장하는 이유: CI 는 커밋된 것만 보므로 gitignore 된 마커로는 강제가 불가능하고,
+사람이 감사하려면 근거가 남아야 한다.
+
+기록은 **코드 상태 해시**로 묶인다(diff 해시가 아니다 — 리뷰 파일을 커밋하면 diff 가 바뀌는
+닭-달걀 문제, 그리고 base ref 에 따라 로컬과 CI 가 다른 값을 낸다). 검증 이후 코드를 한 줄이라도
+고치면 해시가 어긋나 다시 막힌다 — "리뷰 받고 나서 조용히 고치기"를 방지한다.
 
 ```bash
-# 1) Codex 에게 리뷰시킨다 (실행 공식은 .codex/README.md — 결론을 주지 마라)
-# 2) 결과를 직접 검증한 뒤 기록한다
-.agents/scripts/mark-codex-review.sh 4 "state 누락, email 식별 등"
+# Codex 실행·기록을 스크립트가 처리한다 (플래그를 손으로 치지 않는다)
+
+.agents/scripts/codex-review.sh "<중립적 리뷰 프롬프트>"
 ```
 
 **기록만 남기고 실제로 안 돌리는 건 자기기만이다.** 게이트는 기록을 믿을 뿐 진위를 모른다.
@@ -82,8 +89,8 @@ Codex 검증 기록에는 **당시 diff 의 해시**가 들어간다. 검증 이
 
 ## 리뷰 기준
 
-2중 검증 루프의 운영 원칙은 `.agents/README.md`, Codex 실행 공식은 `.codex/README.md`.
+2중 검증 루프의 운영 원칙은 `.agents/README.md`, Codex 실행은 `.codex/README.md`.
 
-여기서 강조할 것 하나: **검증자가 무엇을 검증할 수 있었는지 파악하라.** Codex 를 실행 공식 없이
-돌렸다면 샌드박스가 Gradle 을 막아 자기 수정을 한 번도 실행해보지 못한 것이다. 그 영역은
-4단계에서 전부 다시 확인해야 한다.
+여기서 강조할 것 하나: **리뷰를 받았다고 4단계를 건너뛰지 마라.** Codex 가 놓친 3건 중 2건은
+빌드와 무관한 blind spot 이었다(쿠키 `Secure` 누락, API 문서 미갱신). 샌드박스를 풀어도
+못 잡았을 것들이다 — 그게 교차 검증의 진짜 근거이고, 4단계가 형식이 아닌 이유다.

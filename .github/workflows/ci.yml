@@ -32,7 +32,7 @@ jobs:
         run: ./gradlew compileJava compileTestJava
 
       - name: 테스트
-        # CI 환경변수가 있으면 build.gradle 이 contextLoads() 를 제외한다 (DB 가 필요해서).
+        # DB_URL 이 없으면 build.gradle 이 contextLoads() 를 제외한다 (그 테스트가 실제 MySQL 을 요구).
         # 나머지는 전부 돌리므로 새로 추가되는 테스트도 자동으로 포함된다.
         run: ./gradlew test
 
@@ -44,17 +44,30 @@ jobs:
           files = glob.glob("build/test-results/test/*.xml")
           if not files:
               sys.exit("실행된 테스트가 없다")
-          total = failed = 0
+          total = failed = skipped = 0
           for f in files:
               r = ET.parse(f).getroot()
               total += int(r.get("tests", 0))
               failed += int(r.get("failures", 0)) + int(r.get("errors", 0))
-          print(f"테스트 {total}건, 실패 {failed}건")
-          if total == 0:
-              sys.exit("실행된 테스트가 0건이다")
+              skipped += int(r.get("skipped", 0))
+          # 스킵을 빼야 한다. @Disabled 를 전부 붙이면 tests 는 늘어나지만 실행은 0건이다
+          executed = total - skipped
+          print(f"수집 {total}건, 실행 {executed}건, 실패 {failed}건, 스킵 {skipped}건")
+          if executed <= 0:
+              sys.exit("실행된 테스트가 0건이다 (전부 스킵)")
           if failed:
               sys.exit(f"테스트 실패 {failed}건")
           PY
+
+  mcp-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: MCP 정본 ↔ .mcp.json 동기화 확인
+        # 정본(.agents/mcp/servers.json)만 고치고 sync 를 안 하면 .mcp.json 이 어긋난다.
+        # sync-mcp.sh 는 ~/.codex/config.toml 도 검사하지만 CI 엔 없어 .mcp.json 만 대상이 된다.
+        run: .agents/scripts/sync-mcp.sh --check
 
   secrets:
     runs-on: ubuntu-latest
@@ -67,3 +80,53 @@ jobs:
         # 에이전트가 게이트를 우회해도 여기서 잡힌다.
         # 실제로 settings.local.json 에 로컬 DB 비밀번호가 들어가 있던 전례가 있다.
         run: python3 .agents/scripts/scan-secrets.py --tracked
+
+  # 2중 검증 루프 3단계(Codex 교차 검증)를 강제한다.
+  # Stop 훅의 게이트는 에이전트가 우회할 수 있지만 이 잡은 못 한다.
+  # 코드가 바뀌었는데 그 코드를 검증한 Codex 리뷰 기록이 없으면 실패한다.
+  codex-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: base 결정
+        id: base
+        run: |
+          # PR 이면 base 브랜치, push 면 직전 커밋과 비교해 코드 변경 여부를 판단한다.
+          # 최초 푸시(before 가 0000...)면 비교 대상이 없으니 검증을 요구한다.
+          if [ -n "${{ github.base_ref }}" ]; then
+            echo "ref=origin/${{ github.base_ref }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.before }}" ] && \
+               [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "ref=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 교차 검증 기록 확인
+        run: |
+          if [ -n "${{ steps.base.outputs.ref }}" ]; then
+            python3 .agents/scripts/check-review.py --verify --base "${{ steps.base.outputs.ref }}"
+          else
+            python3 .agents/scripts/check-review.py --verify
+          fi
+
+      - name: 스키마 변경에 DDL 이 동반됐는지
+        # 로컬 게이트에만 있으면 우회 가능하다. 순서를 어기면 프로덕션이 기동조차 못 하므로
+        # CI 에도 둔다 (2026-07-16 Codex 리뷰 지적).
+        run: |
+          BASE="${{ steps.base.outputs.ref }}"
+          [ -z "$BASE" ] && exit 0
+          CHANGED="$(git diff --name-only "$BASE" -- 'src/main/java/**/domain/*.java')"
+          [ -z "$CHANGED" ] && exit 0
+          if git diff --name-only "$BASE" -- schema-changes.sql | grep -q .; then
+            echo "엔티티 변경 + DDL 동반 확인"
+            exit 0
+          fi
+          echo "엔티티를 바꿨는데 schema-changes.sql 이 없다:" >&2
+          echo "$CHANGED" >&2
+          echo "prod 는 ddl-auto: validate 다. 컬럼이 DB 에 없으면 머지 즉시 앱이 기동하지 못한다." >&2
+          exit 1
+
