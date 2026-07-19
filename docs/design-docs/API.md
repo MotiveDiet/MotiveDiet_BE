@@ -32,12 +32,10 @@
 
 
 
-## 1. 인증 (기존 구현됨, 변경 없음)
+## 1. 인증
 
-- `GET /api/oauth2/login/google`
-- `GET /api/oauth2/callback/google`
-
-`../exec-plans/ROADMAP-BE.md` Phase 0의 "iOS 콜백 대응" 작업(커스텀 URL 스킴 리다이렉트)은 아직 미반영 상태.
+- `GET /api/oauth2/login/google` — 구글 동의 화면으로 `302`
+- `GET /api/oauth2/callback/google` — 성공 시 `motivediet://auth?token={JWT}` 로 `302`. JSON 본문을 반환하지 않는다(iOS `ASWebAuthenticationSession` 이 웹뷰라 본문을 앱이 받을 수 없어, 커스텀 URL 스킴 리다이렉트가 토큰 전달 경로다). `state` 불일치는 `400`
 
 ---
 
@@ -148,7 +146,8 @@ Response `200`
 Request: `{ "foodCategoryId": 15 }`
 
 Response `201`: `{ "favoriteFoodId": 6, "foodCategoryId": 15, "name": "떡볶이", "emoji": "🌶️", "weeklyCount": 0, "slotOrder": 4 }`
-Response `400`: 이미 5개 슬롯이 꽉 찼을 때 `{ "error": "FAVORITE_SLOT_FULL" }`
+Response `400`: 이미 5개 슬롯이 꽉 찼을 때 `{ "error": "FAVORITE_SLOT_FULL" }`, 없는 카테고리면 `{ "error": "INVALID_FOOD_CATEGORY" }`
+Response `404`: 남의/없는 슬롯을 PUT/DELETE 할 때 `{ "error": "FAVORITE_NOT_FOUND" }` (POST 제외)
 
 ### `PUT /api/favorite-foods/{favoriteFoodId}`
 
@@ -172,6 +171,8 @@ Response `204`
 ### `POST /api/food-logs`
 
 원탭 로깅. 저장과 동시에 코칭 메시지를 생성해 같은 응답에 담아 반환한다 (`../exec-plans/ROADMAP-BE.md` Phase 2/3의 `generateCoachMessage` 참고).
+
+> **Phase 1 현재 구현**: 로깅 저장 + `weeklyCount` 까지만 반환하고 `coachMessage` 필드는 아직 없다(팩폭 생성은 Phase 2). 미동의 403(`CONSENT_REQUIRED`)도 Phase 2에서 추가된다.
 
 Request: `{ "favoriteFoodId": 1 }`
 

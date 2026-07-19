@@ -3,6 +3,8 @@ package com.example.motivediet_be.domain;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
+
 @Entity
 @Getter
 @Builder
@@ -29,6 +31,17 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "USER_ROLE", nullable = false)
     private Role role;
+
+    @Column(name = "USER_GOAL_WEIGHT")
+    private Double goalWeight;
+
+    @Column(name = "USER_GOAL_DATE")
+    private LocalDate goalDate;
+
+    public void updateOnboarding(Double goalWeight, LocalDate goalDate) {
+        this.goalWeight = goalWeight;
+        this.goalDate = goalDate;
+    }
 
     public void connectGoogleId(String googleId) {
         if (this.googleId == null) {

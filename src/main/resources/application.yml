@@ -1,3 +1,13 @@
 spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:local}
+  # data.sql(음식 카테고리 시드)을 MySQL 에서도 실행하려면 always 가 필요하다(기본값은 embedded 전용).
+  # defer-datasource-initialization: Hibernate 가 테이블을 만든 뒤에 data.sql 이 돌게 순서를 미룬다(local create).
+  sql:
+    init:
+      mode: always
+  jpa:
+    defer-datasource-initialization: true
+
+openai:
+  api-key: ${OPENAI_API_KEY}
