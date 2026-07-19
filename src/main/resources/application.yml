@@ -6,6 +6,8 @@ spring:
   sql:
     init:
       mode: always
+      # 컨테이너 기본 charset 이 ASCII 라 data.sql 의 한글·이모지가 U+FFFD 로 깨진다. 파일 인코딩을 UTF-8 로 고정.
+      encoding: UTF-8
   jpa:
     defer-datasource-initialization: true
 
