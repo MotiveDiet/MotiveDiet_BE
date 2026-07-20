@@ -8,6 +8,8 @@
 
 각 항목은 "무엇을, 어떤 엔티티/엔드포인트/알고리즘으로 구현하는지"를 적었다. `data.sql`은 Spring Boot가 부팅 시 자동 실행하는 초기 데이터 시드 파일을 뜻한다(별도 마이그레이션 도구 도입 안 함).
 
+> **향후 계획 (미결정·미착수)**: LLM 호출(동기 파싱 · 팩폭 · 펀치라인)을 **별도 Python(FastAPI) AI 서버로 분리 배포**하는 방안을 검토 중이다. 지금은 BE(`OpenAiClient`)가 OpenAI를 직접 호출하고 프롬프트도 Java에서 조립하지만, 이관하면 BE는 원재료 컨텍스트(음식명·동기·빈도 카운트 등)만 넘기고 프롬프트 조립·LLM 호출은 AI 서버가 맡는다 — 프롬프트 반복을 BE 배포(=프로덕션 배포)와 분리하려는 목적. 이관 시점·통신 방식은 아직 정하지 않았고, 아래 항목들은 현행(BE 단일 모놀리스) 기준으로 유지한다.
+
 ---
 
 ## Phase 0 — 기반 (Foundation)
@@ -36,10 +38,10 @@
 
 **결정(2026-07-13)**: 5절 동기 연동 팩폭과 6절 음식 빈도 펀치라인은 서로 다른 API 호출이 아니라, `FoodLog` 저장 직후 실행되는 `generateCoachMessage(FoodLog)` 메서드 안에서 **gpt-5 호출 1회**로 통합한다. Phase 2에서는 이 메서드의 기본형(동기 컨텍스트까지)을 만들고, Phase 3에서 같은 메서드에 빈도 컨텍스트를 추가한다 — 별도 메서드/엔드포인트를 새로 만들지 않는다.
 
-- [ ] **동기 연동 팩폭 생성** — `generateCoachMessage(FoodLog)` 신설. `OpenAiClient`로 `gpt-5`를 호출하며 프롬프트는 아래 규칙으로 조합: (1) 로깅된 `FoodCategory.name`은 항상 포함 (2) 콘텐츠 가이드라인 4개 규칙(아래)은 항상 포함 (3) 유효한 `MotiveSignal`이 있으면 `target`/`paraphrase`를 포함하고, `eventDate`가 오늘부터 0~14일 이내면 D-day 카운트다운도 추가로 포함 → 응답 문장을 `POST /api/food-logs` 응답에 포함
+- [x] **동기 연동 팩폭 생성** — `generateCoachMessage(FoodLog)` 신설. `OpenAiClient`로 `gpt-5`를 호출하며 프롬프트는 아래 규칙으로 조합: (1) 로깅된 `FoodCategory.name`은 항상 포함 (2) 콘텐츠 가이드라인 4개 규칙(아래)은 항상 포함 (3) 유효한 `MotiveSignal`이 있으면 `target`/`paraphrase`를 포함하고, `eventDate`가 오늘부터 0~14일 이내면 D-day 카운트다운도 추가로 포함 → 응답 문장을 `POST /api/food-logs` 응답에 포함
   - 콘텐츠 가이드라인(시스템 프롬프트에 고정 삽입): (a) 외모·체중·능력 인신공격 금지, 행동(식습관)에 대한 유머만 (b) 자해·자살·섭식장애 언급 금지 (c) 특정 집단 비하 금지 (d) 욕설·혐오 표현 금지
-- [ ] **코칭 설정 API** — `User`에 `intensityLevel`(enum: OFF/MILD/MEDIUM/STRONG, 기본 MILD), `frequencyLayerEnabled`(Boolean, 기본 true), `motiveComboEnabled`(Boolean, 기본 true) 컬럼 추가. `GET/PATCH /api/users/me/coaching-settings` (`../design-docs/API.md` 6절, 화면 1d의 강도 4단계 + 메시지 레이어 토글 2개에 대응). `intensityLevel=OFF`면 `generateCoachMessage`가 LLM 호출 자체를 스킵, `frequencyLayerEnabled=false`면 빈도 컨텍스트를 프롬프트에서 제외, `motiveComboEnabled=false`면 D-day 카운트다운을 프롬프트에서 제외. 잠금화면 노출 토글은 응답에 `lockScreenEnabled: false` 고정값만 내려주고 PATCH 대상에서 제외(정책상 항상 꺼짐)
-- [ ] **opt-in 동의 저장 API** — `User.consentedAt`(Timestamp, nullable) 컬럼, `PATCH /api/users/me/consent`가 `now()` 저장. `consentedAt`이 null이면 팩폭/펀치라인 관련 API가 403을 반환하도록 공통 인터셉터에서 체크
+- [x] **코칭 설정 API** — `User`에 `intensityLevel`(enum: OFF/MILD/MEDIUM/STRONG, 기본 MILD), `frequencyLayerEnabled`(Boolean, 기본 true), `motiveComboEnabled`(Boolean, 기본 true) 컬럼 추가. `GET/PATCH /api/users/me/coaching-settings` (`../design-docs/API.md` 6절, 화면 1d의 강도 4단계 + 메시지 레이어 토글 2개에 대응). `intensityLevel=OFF`면 `generateCoachMessage`가 LLM 호출 자체를 스킵, `frequencyLayerEnabled=false`면 빈도 컨텍스트를 프롬프트에서 제외, `motiveComboEnabled=false`면 D-day 카운트다운을 프롬프트에서 제외. 잠금화면 노출 토글은 응답에 `lockScreenEnabled: false` 고정값만 내려주고 PATCH 대상에서 제외(정책상 항상 꺼짐)
+- [x] **opt-in 동의 저장 API** — `User.consentedAt`(Timestamp, nullable) 컬럼, `PATCH /api/users/me/consent`가 `now()` 저장. `consentedAt`이 null이면 팩폭/펀치라인 관련 API가 403을 반환하도록 공통 인터셉터에서 체크
 
 ---
 

@@ -2,6 +2,7 @@ package com.example.motivediet_be.controller;
 
 import com.example.motivediet_be.dto.TokenDto;
 import com.example.motivediet_be.jwt.TokenProvider;
+import com.example.motivediet_be.repository.UserRepository;
 import com.example.motivediet_be.service.AuthService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +29,10 @@ class AuthControllerCallbackTest {
 
     @MockitoBean
     private TokenProvider tokenProvider;
+
+    // 전역 ConsentInterceptor 가 이 web 슬라이스에도 로드되므로 그 의존성만 채워준다(테스트 대상 아님).
+    @MockitoBean
+    private UserRepository userRepository;
 
     @Test
     @WithMockUser
