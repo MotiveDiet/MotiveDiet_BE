@@ -172,7 +172,7 @@ Response `204`
 
 원탭 로깅. 저장과 동시에 코칭 메시지를 생성해 같은 응답에 담아 반환한다 (`../exec-plans/ROADMAP-BE.md` Phase 2/3의 `generateCoachMessage` 참고).
 
-> **Phase 2 구현됨(feat/#4)**: 로깅 저장과 함께 `generateCoachMessage`로 팩폭을 생성해 `coachMessage`에 담는다. 강도 `OFF`거나 생성 실패 시 `coachMessage`는 `null`. 미동의(`consentedAt` null)면 `ConsentInterceptor`가 `403 CONSENT_REQUIRED`로 막는다. 빈도(펀치라인) 컨텍스트는 Phase 3에서 같은 메서드에 추가된다.
+> **Phase 2 구현됨(feat/#4)**: 로깅 저장과 함께 `generateCoachMessage`로 팩폭을 생성해 `coachMessage`에 담는다. 강도 `OFF`거나 생성 실패 시 `coachMessage`는 `null`. 미동의(`consentedAt` null)면 `ConsentInterceptor`가 `403 CONSENT_REQUIRED`로 막는다. **Phase 3 구현됨(feat/#5)**: `frequencyLayerEnabled`가 켜져 있고 이번 주 카운트(`weeklyCount`)가 `weeklyThreshold` 이상이면 그 카운트를 프롬프트에 실어 펀치라인을 만든다. 응답 스키마는 그대로이고(빈도는 `coachMessage.text`에만 녹음) 별도 필드·엔드포인트를 추가하지 않는다.
 
 Request: `{ "favoriteFoodId": 1 }`
 

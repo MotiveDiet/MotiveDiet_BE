@@ -16,7 +16,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Service
@@ -33,14 +32,15 @@ public class FoodLogService {
         FavoriteFood favorite = favoriteFoodRepository.findByIdAndUserId(favoriteFoodId, userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "FAVORITE_NOT_FOUND"));
 
+        LocalDateTime loggedAt = LocalDateTime.now();
         FoodLog saved = foodLogRepository.save(FoodLog.builder()
                 .userId(userId)
                 .foodCategoryId(favorite.getFoodCategoryId())
-                .loggedAt(LocalDateTime.now())
+                .loggedAt(loggedAt)
                 .build());
 
         long weeklyCount = foodLogRepository.countByUserIdAndFoodCategoryIdAndLoggedAtGreaterThanEqual(
-                userId, favorite.getFoodCategoryId(), LocalDate.now().with(DayOfWeek.MONDAY).atStartOfDay());
+                userId, favorite.getFoodCategoryId(), loggedAt.toLocalDate().with(DayOfWeek.MONDAY).atStartOfDay());
 
         FoodCategory category = foodCategoryRepository.findById(favorite.getFoodCategoryId())
                 .orElseThrow(() -> new RuntimeException("음식 카테고리를 찾을 수 없습니다."));
@@ -48,7 +48,7 @@ public class FoodLogService {
         // 미동의는 ConsentInterceptor가 먼저 403으로 막으므로 여기 도달하면 동의된 사용자다.
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("유저를 찾을 수 없습니다."));
-        CoachMessage coachMessage = coachMessageService.generate(user, category);
+        CoachMessage coachMessage = coachMessageService.generate(user, category, weeklyCount);
 
         return new FoodLogResponse(
                 saved.getId(),

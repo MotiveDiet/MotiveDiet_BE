@@ -49,9 +49,9 @@
 
 **결정(2026-07-14)**: tier1/2/3 등급 구분을 없앴다. `FoodCategory.weeklyThreshold`(Phase 1에서 추가) 하나만 쓰고, 이 값 이상인 로그는 첫 도달 여부와 상관없이 **매번** 실제 누적 횟수를 프롬프트에 실어 보낸다 — 숫자가 매번 다르므로 GPT-5가 만드는 문장도 자연히 달라짐. 문구는 DB 템플릿 풀이 아니라 Phase 2의 `generateCoachMessage(FoodLog)`가 프롬프트에 빈도 컨텍스트를 추가로 얹어서 생성한다. **새 GPT 호출을 만들지 않는다** — 이미 Phase 2에서 나가는 호출 1회에 조건만 더 붙는다.
 
-- [ ] **빈도 판정** — `FoodLog` 저장 시 `SELECT COUNT(*) FROM food_log WHERE user_id=? AND food_category_id=? AND logged_at >= NOW() - INTERVAL 7 DAY`로 이번 주 카운트 산출 → `count >= FoodCategory.weeklyThreshold`인지만 확인 (몇 번째로 넘었는지 따질 필요 없음, 매번 같은 조건 재확인)
-- [ ] **`generateCoachMessage` 확장** — 위 조건이 참이면 Phase 2 프롬프트 조합 규칙에 `{음식명, 이번 주 실제 카운트}`를 추가. 거짓이면 Phase 2의 기본형(동기 컨텍스트만) 그대로 사용. 결과적으로 한 메서드가 "단독 팩폭 / 동기 참조 팩폭 / 빈도 펀치라인 / 동기+빈도 콤보" 네 가지를 프롬프트 조건 조합만으로 커버
-- [ ] **잠금화면 알림 노출 금지** — 이 메시지들은 애초에 push 발송 로직을 타지 않고 `POST /api/food-logs` 응답 body로만 반환 (별도 알림 채널을 만들지 않음)
+- [x] **빈도 판정** — `FoodLog` 저장 직후 산출하는 이번 주 카운트(`FoodLogService.weeklyCount`, 응답 chip과 동일한 월요일 기준 값)를 재사용해 `weeklyCount >= FoodCategory.weeklyThreshold`인지만 확인 (몇 번째로 넘었는지 따질 필요 없음). **구현 노트**: 초안의 `NOW() - INTERVAL 7 DAY`(롤링 7일) 대신 기존 월요일 기준 `weeklyCount`를 그대로 썼다 — 프롬프트에 싣는 숫자와 응답 chip("치킨 · 이번 주 N회")이 어긋나면 UI 불일치가 되므로, 같은 값을 공유하고 쿼리도 새로 만들지 않는다
+- [x] **`generateCoachMessage` 확장** — 위 조건이 참이고 `frequencyLayerEnabled`가 켜져 있으면 Phase 2 프롬프트 조합 규칙에 `{음식명, 이번 주 실제 카운트}`를 추가. 거짓이면 Phase 2의 기본형(동기 컨텍스트만) 그대로 사용. 결과적으로 한 메서드가 "단독 팩폭 / 동기 참조 팩폭 / 빈도 펀치라인 / 동기+빈도 콤보" 네 가지를 프롬프트 조건 조합만으로 커버
+- [x] **잠금화면 알림 노출 금지** — 이 메시지들은 애초에 push 발송 로직을 타지 않고 `POST /api/food-logs` 응답 body로만 반환 (별도 알림 채널을 만들지 않음)
 
 ---
 
