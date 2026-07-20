@@ -46,3 +46,13 @@ CREATE TABLE `food_log` (
     `logged_at`        DATETIME(6) NOT NULL,
     PRIMARY KEY (`id`)
 ) DEFAULT CHARSET = utf8mb4;
+
+-- ── Phase 2 (feat/#4): 팩폭 코칭 엔진 — 코칭 설정 + opt-in 동의 ──
+-- 머지 전에 반드시 이 블록을 prod DB 에 먼저 적용할 것 (ddl-auto: validate).
+-- 설정 3개는 NOT NULL DEFAULT 로 추가한다: 기존 행은 DEFAULT 로 채워지고, 배포 중인 구버전 앱이
+-- 이 컬럼 없이 INSERT 해도 DEFAULT 가 먹으므로 안전하다. consented_at 은 "미동의=null" 이라 nullable.
+ALTER TABLE `user`
+    ADD COLUMN `USER_INTENSITY_LEVEL`         VARCHAR(255) NOT NULL DEFAULT 'MILD',
+    ADD COLUMN `USER_FREQUENCY_LAYER_ENABLED` TINYINT(1)   NOT NULL DEFAULT 1,
+    ADD COLUMN `USER_MOTIVE_COMBO_ENABLED`    TINYINT(1)   NOT NULL DEFAULT 1,
+    ADD COLUMN `USER_CONSENTED_AT`            DATETIME(6)  NULL;

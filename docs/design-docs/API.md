@@ -172,7 +172,7 @@ Response `204`
 
 원탭 로깅. 저장과 동시에 코칭 메시지를 생성해 같은 응답에 담아 반환한다 (`../exec-plans/ROADMAP-BE.md` Phase 2/3의 `generateCoachMessage` 참고).
 
-> **Phase 1 현재 구현**: 로깅 저장 + `weeklyCount` 까지만 반환하고 `coachMessage` 필드는 아직 없다(팩폭 생성은 Phase 2). 미동의 403(`CONSENT_REQUIRED`)도 Phase 2에서 추가된다.
+> **Phase 2 구현됨(feat/#4)**: 로깅 저장과 함께 `generateCoachMessage`로 팩폭을 생성해 `coachMessage`에 담는다. 강도 `OFF`거나 생성 실패 시 `coachMessage`는 `null`. 미동의(`consentedAt` null)면 `ConsentInterceptor`가 `403 CONSENT_REQUIRED`로 막는다. 빈도(펀치라인) 컨텍스트는 Phase 3에서 같은 메서드에 추가된다.
 
 Request: `{ "favoriteFoodId": 1 }`
 
