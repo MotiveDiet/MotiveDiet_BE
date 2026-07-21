@@ -39,8 +39,8 @@ public class HomeService {
         LocalDate today = LocalDate.now();
         LocalDate weekStart = today.with(DayOfWeek.MONDAY);
 
-        Set<LocalDate> logDates = foodLogRepository.findLoggedAtByUserId(userId).stream()
-                .map(java.time.LocalDateTime::toLocalDate)
+        Set<LocalDate> logDates = foodLogRepository.findLogDates(userId).stream()
+                .map(java.sql.Date::toLocalDate)
                 .collect(Collectors.toUnmodifiableSet());
         Map<Long, Long> weeklyCountByCategory = foodLogRepository
                 .findByUserIdAndLoggedAtGreaterThanEqual(userId, weekStart.atStartOfDay())

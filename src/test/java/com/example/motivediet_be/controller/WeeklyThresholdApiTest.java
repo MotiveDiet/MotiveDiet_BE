@@ -64,7 +64,10 @@ class WeeklyThresholdApiTest {
         when(foodCategoryRepository.findAll()).thenReturn(List.of(chicken));
         when(foodCategoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(chicken));
         when(motiveSignalRepository.findFirstByUserIdOrderByIdDesc(USER_ID)).thenReturn(Optional.empty());
-        when(foodLogRepository.findLogDates(USER_ID)).thenReturn(List.of());
+        // 빈 리스트로 두면 날짜 변환 경로가 아예 실행되지 않아, 이 응답을 500 으로 만들던
+        // java.sql.Date -> LocalDate 문제를 못 잡는다 (2026-07-21 장애). 반드시 1건 이상 준다.
+        when(foodLogRepository.findLogDates(USER_ID))
+                .thenReturn(List.of(java.sql.Date.valueOf(java.time.LocalDate.now())));
         when(foodLogRepository.countByUserIdAndFoodCategoryIdAndLoggedAtGreaterThanEqual(
                 anyLong(), anyLong(), any(LocalDateTime.class))).thenReturn(3L);
     }
