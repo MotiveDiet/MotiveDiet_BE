@@ -45,6 +45,25 @@
 
 
 
+### `GET /api/users/me`
+
+로그인 직후 FE가 동의화면·온보딩·홈 중 어디로 갈지 판별하는 용도.
+
+Response `200`
+
+```json
+{
+  "consentedAt": "2026-07-12T09:41:00",
+  "goalWeight": 68.0,
+  "goalDate": "2026-09-01",
+  "onboarded": true
+}
+```
+
+- `consentedAt`이 `null`이면 미동의 → 동의화면
+- `onboarded`는 `goalWeight`와 `goalDate`가 **둘 다** 있을 때만 `true`. `false`면 온보딩 화면
+- 동의 게이트(`ConsentInterceptor`) 대상이 아니다 — 미동의 상태에서도 200을 준다
+
 ### `PATCH /api/users/me/onboarding`
 
 Request
@@ -103,11 +122,11 @@ Response `200`
   ],
   "currentStreakDays": 12,
   "favoriteFoods": [
-    { "favoriteFoodId": 1, "foodCategoryId": 10, "name": "치킨", "emoji": "🍗", "weeklyCount": 3, "slotOrder": 0 },
-    { "favoriteFoodId": 2, "foodCategoryId": 11, "name": "라면", "emoji": "🍜", "weeklyCount": 1, "slotOrder": 1 },
-    { "favoriteFoodId": 3, "foodCategoryId": 12, "name": "빵", "emoji": "🥐", "weeklyCount": 2, "slotOrder": 2 },
-    { "favoriteFoodId": 4, "foodCategoryId": 13, "name": "술", "emoji": "🍺", "weeklyCount": 0, "slotOrder": 3 },
-    { "favoriteFoodId": 5, "foodCategoryId": 14, "name": "샐러드", "emoji": "🥗", "weeklyCount": 4, "slotOrder": 4 }
+    { "favoriteFoodId": 1, "foodCategoryId": 10, "name": "치킨", "emoji": "🍗", "weeklyCount": 3, "weeklyThreshold": 2, "slotOrder": 0 },
+    { "favoriteFoodId": 2, "foodCategoryId": 11, "name": "라면", "emoji": "🍜", "weeklyCount": 1, "weeklyThreshold": 2, "slotOrder": 1 },
+    { "favoriteFoodId": 3, "foodCategoryId": 12, "name": "빵", "emoji": "🥐", "weeklyCount": 2, "weeklyThreshold": 3, "slotOrder": 2 },
+    { "favoriteFoodId": 4, "foodCategoryId": 13, "name": "술", "emoji": "🍺", "weeklyCount": 0, "weeklyThreshold": 2, "slotOrder": 3 },
+    { "favoriteFoodId": 5, "foodCategoryId": 14, "name": "샐러드", "emoji": "🥗", "weeklyCount": 4, "weeklyThreshold": 2, "slotOrder": 4 }
   ],
   "favoriteSlotCapacity": 5
 }
@@ -117,6 +136,7 @@ Response `200`
 - `weekStreak`는 이번 주 월~일 고정 7칸. `logged`는 `EXISTS(SELECT 1 FROM food_log WHERE user_id=? AND DATE(logged_at)=?)`. 오늘·미래 날짜도 로그가 없으면 그냥 `false` — 과거 미이행과 시각적으로 구분하지 않는다(목업에서 토요일(오늘)·일요일(미래)이 똑같은 빈 원으로 보이는 것과 동일). "미달성 날 표시"는 FE가 `false`일 때 아이콘만 정하면 됨
 - `currentStreakDays` 계산: 오늘부터 거꾸로 날짜를 하나씩 보면서 `logged=true`인 날을 센다. 단, **오늘이 아직** `logged=false`**여도 스트릭을 끊지 않는다** — 오늘 로그가 없으면 어제부터 거꾸로 세기 시작. 그렇게 계속 `logged=true`가 이어지다가 처음 끊기는 지점에서 멈춘다
 - `favoriteFoods.weeklyCount`는 `FoodCategory.weeklyThreshold`와 별개로 그냥 이번 주 카운트 그대로 노출(홈 화면 문구용, 팩폭 트리거 판정은 `POST /api/food-logs` 내부에서 별도 계산)
+- `favoriteFoods.weeklyThreshold`는 그 카테고리의 시드 고정값(`FoodCategory.weeklyThreshold`). 슬롯 카드의 "이번 주 N회"를 FE가 강조할지 판정하는 기준 — `weeklyCount >= weeklyThreshold`면 강조. 팩폭 트리거 판정 자체는 여전히 `POST /api/food-logs` 내부에서 별도 계산
 
 ---
 
@@ -145,7 +165,7 @@ Response `200`
 
 Request: `{ "foodCategoryId": 15 }`
 
-Response `201`: `{ "favoriteFoodId": 6, "foodCategoryId": 15, "name": "떡볶이", "emoji": "🌶️", "weeklyCount": 0, "slotOrder": 4 }`
+Response `201`: `{ "favoriteFoodId": 6, "foodCategoryId": 15, "name": "떡볶이", "emoji": "🌶️", "weeklyCount": 0, "weeklyThreshold": 2, "slotOrder": 4 }`
 Response `400`: 이미 5개 슬롯이 꽉 찼을 때 `{ "error": "FAVORITE_SLOT_FULL" }`, 없는 카테고리면 `{ "error": "INVALID_FOOD_CATEGORY" }`
 Response `404`: 남의/없는 슬롯을 PUT/DELETE 할 때 `{ "error": "FAVORITE_NOT_FOUND" }` (POST 제외)
 
@@ -172,7 +192,7 @@ Response `204`
 
 원탭 로깅. 저장과 동시에 코칭 메시지를 생성해 같은 응답에 담아 반환한다 (`../exec-plans/ROADMAP-BE.md` Phase 2/3의 `generateCoachMessage` 참고).
 
-> **Phase 2 구현됨(feat/#4)**: 로깅 저장과 함께 `generateCoachMessage`로 팩폭을 생성해 `coachMessage`에 담는다. 강도 `OFF`거나 생성 실패 시 `coachMessage`는 `null`. 미동의(`consentedAt` null)면 `ConsentInterceptor`가 `403 CONSENT_REQUIRED`로 막는다. 빈도(펀치라인) 컨텍스트는 Phase 3에서 같은 메서드에 추가된다.
+> **Phase 2 구현됨(feat/#4)**: 로깅 저장과 함께 `generateCoachMessage`로 팩폭을 생성해 `coachMessage`에 담는다. 강도 `OFF`거나 생성 실패 시 `coachMessage`는 `null`. 미동의(`consentedAt` null)면 `ConsentInterceptor`가 `403 CONSENT_REQUIRED`로 막는다. **Phase 3 구현됨(feat/#5)**: `frequencyLayerEnabled`가 켜져 있고 이번 주 카운트(`weeklyCount`)가 `weeklyThreshold` 이상이면 그 카운트를 프롬프트에 실어 펀치라인을 만든다. 응답 스키마는 그대로이고(빈도는 `coachMessage.text`에만 녹음) 별도 필드·엔드포인트를 추가하지 않는다.
 
 Request: `{ "favoriteFoodId": 1 }`
 

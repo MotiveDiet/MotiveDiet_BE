@@ -6,5 +6,6 @@ public record FavoriteFoodResponse(
         String name,
         String emoji,
         long weeklyCount,
+        int weeklyThreshold,
         int slotOrder) {
 }

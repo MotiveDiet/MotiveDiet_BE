@@ -4,6 +4,7 @@ import com.example.motivediet_be.domain.User;
 import com.example.motivediet_be.dto.CoachingSettingsRequest;
 import com.example.motivediet_be.dto.CoachingSettingsResponse;
 import com.example.motivediet_be.dto.ConsentResponse;
+import com.example.motivediet_be.dto.UserMeResponse;
 import com.example.motivediet_be.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,11 @@ import java.time.LocalDateTime;
 public class UserSettingsService {
 
     private final UserRepository userRepository;
+
+    @Transactional(readOnly = true)
+    public UserMeResponse getMe(Long userId) {
+        return UserMeResponse.from(findUser(userId));
+    }
 
     @Transactional(readOnly = true)
     public CoachingSettingsResponse getCoachingSettings(Long userId) {

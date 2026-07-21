@@ -101,9 +101,10 @@ public class OpenAiClient {
      * daysUntil이 null이면 motiveComboText도 null을 반환하도록 프롬프트에서 지시한다.
      */
     public CoachResult generateCoachMessage(String categoryName, IntensityLevel intensity,
-                                            String motiveTarget, String motiveParaphrase, Integer daysUntil) {
+                                            String motiveTarget, String motiveParaphrase, Integer daysUntil,
+                                            Integer frequencyCount) {
         String content = postForContent(buildCoachRequest(
-                categoryName, intensity, motiveTarget, motiveParaphrase, daysUntil), "팩폭 생성");
+                categoryName, intensity, motiveTarget, motiveParaphrase, daysUntil, frequencyCount), "팩폭 생성");
         CoachResult result = gson.fromJson(content, CoachResult.class);
         // 스키마가 빈 문자열을 막지 못하므로(OpenAI Structured Outputs는 minLength 미지원) 여기서 방어한다.
         if (result == null || !StringUtils.hasText(result.text())) {
@@ -141,12 +142,18 @@ public class OpenAiClient {
     }
 
     private Map<String, Object> buildCoachRequest(String categoryName, IntensityLevel intensity,
-                                                  String motiveTarget, String motiveParaphrase, Integer daysUntil) {
+                                                  String motiveTarget, String motiveParaphrase, Integer daysUntil,
+                                                  Integer frequencyCount) {
         boolean hasMotive = motiveTarget != null || motiveParaphrase != null;
 
         StringBuilder ctx = new StringBuilder();
         ctx.append("방금 기록한 음식: ").append(categoryName).append("\n");
         ctx.append("코칭 강도: ").append(intensity.name()).append("\n");
+        // Phase 3 빈도 레이어: 이번 주 반복 횟수가 임계 이상일 때만 값이 넘어온다. text 에 그 숫자를 녹여 펀치라인을 만든다.
+        if (frequencyCount != null) {
+            ctx.append("이번 주 이 음식을 먹은 횟수: ").append(frequencyCount)
+                    .append("회(방금 것 포함). 이 반복 횟수를 text 팩폭에 자연스럽게 녹여라.\n");
+        }
         if (motiveTarget != null) {
             ctx.append("사용자의 다이어트 동기 대상: ").append(motiveTarget).append("\n");
         }

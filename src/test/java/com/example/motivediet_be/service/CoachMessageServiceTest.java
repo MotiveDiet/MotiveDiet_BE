@@ -29,9 +29,11 @@ class CoachMessageServiceTest {
     private final OpenAiClient openAiClient = mock(OpenAiClient.class);
     private final CoachMessageService service = new CoachMessageService(motiveSignalRepository, openAiClient);
 
+    // weeklyThreshold=2 — 아래 동기 테스트는 weeklyCount=1(임계 미만)로 호출해 빈도 컨텍스트를 끈다.
     private FoodCategory category() {
         FoodCategory category = mock(FoodCategory.class);
         when(category.getName()).thenReturn("치킨");
+        when(category.getWeeklyThreshold()).thenReturn(2);
         return category;
     }
 
@@ -40,15 +42,15 @@ class CoachMessageServiceTest {
     }
 
     private void stubLlm(String text, String motiveComboText) {
-        when(openAiClient.generateCoachMessage(any(), any(), any(), any(), any()))
+        when(openAiClient.generateCoachMessage(any(), any(), any(), any(), any(), any()))
                 .thenReturn(new OpenAiClient.CoachResult(text, motiveComboText));
     }
 
     @Test
     @DisplayName("강도 OFF면 LLM을 호출하지 않고 null")
     void off_스킵() {
-        assertNull(service.generate(user(IntensityLevel.OFF, true), category()));
-        verify(openAiClient, never()).generateCoachMessage(any(), any(), any(), any(), any());
+        assertNull(service.generate(user(IntensityLevel.OFF, true), category(), 1));
+        verify(openAiClient, never()).generateCoachMessage(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -60,7 +62,7 @@ class CoachMessageServiceTest {
         when(motiveSignalRepository.findFirstByUserIdOrderByIdDesc(1L)).thenReturn(Optional.of(signal));
         stubLlm("치킨 또 먹네", "D-10인데 이럴 거야?");
 
-        CoachMessage message = service.generate(user(IntensityLevel.STRONG, true), category());
+        CoachMessage message = service.generate(user(IntensityLevel.STRONG, true), category(), 1);
 
         assertEquals("FACTBOMB", message.toneType());
         assertEquals("치킨 또 먹네", message.text());
@@ -69,7 +71,7 @@ class CoachMessageServiceTest {
 
         ArgumentCaptor<Integer> daysUntil = ArgumentCaptor.forClass(Integer.class);
         verify(openAiClient).generateCoachMessage(eq("치킨"), eq(IntensityLevel.STRONG),
-                eq("여자친구 생일"), eq("생일 전까지 감량"), daysUntil.capture());
+                eq("여자친구 생일"), eq("생일 전까지 감량"), daysUntil.capture(), eq(null));
         assertEquals(10, daysUntil.getValue());
     }
 
@@ -82,11 +84,11 @@ class CoachMessageServiceTest {
         when(motiveSignalRepository.findFirstByUserIdOrderByIdDesc(1L)).thenReturn(Optional.of(signal));
         stubLlm("치킨 또 먹네", "무시될 콤보");
 
-        CoachMessage message = service.generate(user(IntensityLevel.STRONG, false), category());
+        CoachMessage message = service.generate(user(IntensityLevel.STRONG, false), category(), 1);
 
         assertNull(message.motiveCombo());
         verify(openAiClient).generateCoachMessage(eq("치킨"), any(),
-                eq("여자친구 생일"), eq("생일 전까지 감량"), eq(null));
+                eq("여자친구 생일"), eq("생일 전까지 감량"), eq(null), eq(null));
     }
 
     @Test
@@ -98,11 +100,11 @@ class CoachMessageServiceTest {
         when(motiveSignalRepository.findFirstByUserIdOrderByIdDesc(1L)).thenReturn(Optional.of(signal));
         stubLlm("치킨 또 먹네", null);
 
-        CoachMessage message = service.generate(user(IntensityLevel.MILD, true), category());
+        CoachMessage message = service.generate(user(IntensityLevel.MILD, true), category(), 1);
 
         assertNull(message.motiveCombo());
         verify(openAiClient).generateCoachMessage(eq("치킨"), any(),
-                eq("여자친구 생일"), eq("생일 전까지 감량"), eq(null));
+                eq("여자친구 생일"), eq("생일 전까지 감량"), eq(null), eq(null));
     }
 
     @Test
@@ -114,10 +116,10 @@ class CoachMessageServiceTest {
         when(motiveSignalRepository.findFirstByUserIdOrderByIdDesc(1L)).thenReturn(Optional.of(signal));
         stubLlm("치킨 또 먹네", null);
 
-        CoachMessage message = service.generate(user(IntensityLevel.MILD, true), category());
+        CoachMessage message = service.generate(user(IntensityLevel.MILD, true), category(), 1);
 
         assertNull(message.motiveCombo());
-        verify(openAiClient).generateCoachMessage(eq("치킨"), any(), eq(null), eq(null), eq(null));
+        verify(openAiClient).generateCoachMessage(eq("치킨"), any(), eq(null), eq(null), eq(null), eq(null));
     }
 
     @Test
@@ -129,10 +131,10 @@ class CoachMessageServiceTest {
         when(motiveSignalRepository.findFirstByUserIdOrderByIdDesc(1L)).thenReturn(Optional.of(signal));
         stubLlm("치킨 또 먹네", null);
 
-        CoachMessage message = service.generate(user(IntensityLevel.MILD, true), category());
+        CoachMessage message = service.generate(user(IntensityLevel.MILD, true), category(), 1);
 
         assertNull(message.motiveCombo());
-        verify(openAiClient).generateCoachMessage(eq("치킨"), any(), eq(null), eq(null), eq(null));
+        verify(openAiClient).generateCoachMessage(eq("치킨"), any(), eq(null), eq(null), eq(null), eq(null));
     }
 
     @Test
@@ -144,7 +146,7 @@ class CoachMessageServiceTest {
         when(motiveSignalRepository.findFirstByUserIdOrderByIdDesc(1L)).thenReturn(Optional.of(signal));
         stubLlm("치킨 또 먹네", "");
 
-        CoachMessage message = service.generate(user(IntensityLevel.STRONG, true), category());
+        CoachMessage message = service.generate(user(IntensityLevel.STRONG, true), category(), 1);
 
         assertNull(message.motiveCombo());
         assertEquals("치킨 또 먹네", message.text());
@@ -154,9 +156,55 @@ class CoachMessageServiceTest {
     @DisplayName("LLM이 실패하면 로그는 이미 저장됐으므로 메시지 없이 null을 반환한다")
     void 생성_실패_graceful() {
         when(motiveSignalRepository.findFirstByUserIdOrderByIdDesc(1L)).thenReturn(Optional.empty());
-        when(openAiClient.generateCoachMessage(any(), any(), any(), any(), any()))
+        when(openAiClient.generateCoachMessage(any(), any(), any(), any(), any(), any()))
                 .thenThrow(new RuntimeException("LLM 다운"));
 
-        assertNull(service.generate(user(IntensityLevel.MILD, true), category()));
+        assertNull(service.generate(user(IntensityLevel.MILD, true), category(), 1));
+    }
+
+    @Test
+    @DisplayName("이번 주 카운트가 임계 이상이고 빈도 레이어가 켜져 있으면 실제 카운트를 프롬프트에 넘긴다")
+    void 빈도_임계도달() {
+        when(motiveSignalRepository.findFirstByUserIdOrderByIdDesc(1L)).thenReturn(Optional.empty());
+        stubLlm("치킨 이번 주만 4번째냐", null);
+
+        service.generate(user(IntensityLevel.MEDIUM, true), category(), 4);   // threshold 2
+
+        verify(openAiClient).generateCoachMessage(eq("치킨"), any(), eq(null), eq(null), eq(null), eq(4));
+    }
+
+    @Test
+    @DisplayName("이번 주 카운트가 임계와 같은 첫 도달 시점에도 빈도 컨텍스트를 넘긴다")
+    void 빈도_임계경계_포함() {
+        when(motiveSignalRepository.findFirstByUserIdOrderByIdDesc(1L)).thenReturn(Optional.empty());
+        stubLlm("치킨 이번 주만 2번째냐", null);
+
+        service.generate(user(IntensityLevel.MEDIUM, true), category(), 2);   // threshold 2
+
+        verify(openAiClient).generateCoachMessage(eq("치킨"), any(), eq(null), eq(null), eq(null), eq(2));
+    }
+
+    @Test
+    @DisplayName("이번 주 카운트가 임계 미만이면 빈도 컨텍스트를 넘기지 않는다")
+    void 빈도_임계미만() {
+        when(motiveSignalRepository.findFirstByUserIdOrderByIdDesc(1L)).thenReturn(Optional.empty());
+        stubLlm("치킨 팩폭", null);
+
+        service.generate(user(IntensityLevel.MEDIUM, true), category(), 1);   // threshold 2
+
+        verify(openAiClient).generateCoachMessage(eq("치킨"), any(), eq(null), eq(null), eq(null), eq(null));
+    }
+
+    @Test
+    @DisplayName("frequencyLayerEnabled=false면 임계 이상이어도 빈도 컨텍스트를 넘기지 않는다")
+    void 빈도_레이어_off() {
+        when(motiveSignalRepository.findFirstByUserIdOrderByIdDesc(1L)).thenReturn(Optional.empty());
+        stubLlm("치킨 팩폭", null);
+
+        User u = User.builder().id(1L).intensityLevel(IntensityLevel.MEDIUM)
+                .frequencyLayerEnabled(false).motiveComboEnabled(true).build();
+        service.generate(u, category(), 4);   // threshold 2, 임계 이상이지만 레이어 off
+
+        verify(openAiClient).generateCoachMessage(eq("치킨"), any(), eq(null), eq(null), eq(null), eq(null));
     }
 }

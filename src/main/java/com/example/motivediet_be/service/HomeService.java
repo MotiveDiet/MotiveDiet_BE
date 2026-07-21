@@ -89,6 +89,7 @@ public class HomeService {
                             category.getName(),
                             category.getEmoji(),
                             weeklyCountByCategory.getOrDefault(favorite.getFoodCategoryId(), 0L),
+                            category.getWeeklyThreshold(),
                             favorite.getSlotOrder());
                 })
                 .toList();

@@ -102,6 +102,6 @@ public class FavoriteFoodService {
                 userId, category.getId(), LocalDate.now().with(DayOfWeek.MONDAY).atStartOfDay());
         return new FavoriteFoodResponse(
                 favorite.getId(), category.getId(), category.getName(), category.getEmoji(),
-                weeklyCount, favorite.getSlotOrder());
+                weeklyCount, category.getWeeklyThreshold(), favorite.getSlotOrder());
     }
 }

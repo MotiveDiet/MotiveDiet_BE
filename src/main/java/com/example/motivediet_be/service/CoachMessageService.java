@@ -17,8 +17,8 @@ import java.time.temporal.ChronoUnit;
 
 /**
  * POST /api/food-logs 저장 직후 팩폭 한 문장을 생성한다 (gpt-5 호출 1회).
- * ROADMAP Phase 2: 음식명 + 콘텐츠 가이드라인은 항상, 유효 동기가 있으면 target/paraphrase,
- * D-14 이내면 D-day 카운트다운까지 프롬프트에 얹는다. (빈도 컨텍스트는 Phase 3에서 추가)
+ * ROADMAP Phase 2/3: 음식명 + 콘텐츠 가이드라인은 항상, 유효 동기가 있으면 target/paraphrase,
+ * D-14 이내면 D-day 카운트다운, 이번 주 카운트가 임계 이상이면 빈도 컨텍스트까지 프롬프트에 얹는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -31,8 +31,11 @@ public class CoachMessageService {
     private final MotiveSignalRepository motiveSignalRepository;
     private final OpenAiClient openAiClient;
 
-    /** 강도 OFF면 LLM 호출을 스킵하고 null. 생성 실패도 로깅만 하고 null(로그 저장 자체는 이미 끝났다). */
-    public CoachMessage generate(User user, FoodCategory category) {
+    /**
+     * 강도 OFF면 LLM 호출을 스킵하고 null. 생성 실패도 로깅만 하고 null(로그 저장 자체는 이미 끝났다).
+     * weeklyCount는 방금 저장분까지 포함한 이번 주 카운트(응답 chip과 동일 값). Phase 3 빈도 레이어 판정에 쓴다.
+     */
+    public CoachMessage generate(User user, FoodCategory category, long weeklyCount) {
         if (user.getIntensityLevel() == IntensityLevel.OFF) {
             return null;
         }
@@ -48,9 +51,13 @@ public class CoachMessageService {
         boolean hasMotiveContent = target != null || paraphrase != null;
         Integer daysUntil = hasMotiveContent ? motiveComboDaysUntil(user, signal, today) : null;
 
+        // Phase 3: 레이어가 켜져 있고 이번 주 카운트가 임계 이상이면 실제 카운트를 프롬프트에 싣는다. 아니면 null.
+        Integer frequencyCount = (user.isFrequencyLayerEnabled() && weeklyCount >= category.getWeeklyThreshold())
+                ? (int) weeklyCount : null;
+
         try {
             OpenAiClient.CoachResult result = openAiClient.generateCoachMessage(
-                    category.getName(), user.getIntensityLevel(), target, paraphrase, daysUntil);
+                    category.getName(), user.getIntensityLevel(), target, paraphrase, daysUntil, frequencyCount);
 
             CoachMessage.MotiveCombo combo = (daysUntil != null && StringUtils.hasText(result.motiveComboText()))
                     ? new CoachMessage.MotiveCombo(result.motiveComboText(), daysUntil)
