@@ -5,6 +5,7 @@ import com.example.motivediet_be.dto.CoachingSettingsResponse;
 import com.example.motivediet_be.dto.ConsentResponse;
 import com.example.motivediet_be.dto.OnboardingRequest;
 import com.example.motivediet_be.dto.OnboardingResponse;
+import com.example.motivediet_be.dto.UserMeResponse;
 import com.example.motivediet_be.service.OnboardingService;
 import com.example.motivediet_be.service.UserSettingsService;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,11 @@ public class UserController {
 
     private final OnboardingService onboardingService;
     private final UserSettingsService userSettingsService;
+
+    @GetMapping
+    public UserMeResponse me(Principal principal) {
+        return userSettingsService.getMe(Long.parseLong(principal.getName()));
+    }
 
     @PatchMapping("/onboarding")
     public OnboardingResponse onboarding(Principal principal, @RequestBody OnboardingRequest request) {
