@@ -19,6 +19,10 @@ Spring Boot 4.1 / Java 17 / MySQL / Spring Security(Stateless) + JWT.
 2. **`main` 푸시 = 즉시 프로덕션 배포.** 코드는 `feat/#<이슈번호>` 에서 작업한다
 3. **비밀값은 Railway 환경변수에만.** yml 은 `${ENV}` 플레이스홀더만. 문서·커밋·로그에 실제 값 금지 (`SECURITY.md`)
 4. **`.java-version`(Java 17)·`railpack.json`(단일모듈 시작커맨드) 지우지 말 것.** 빌더 기본값과 달라서 이 파일들이 잡아주고 있다
+5. **빈 계정으로만 확인하면 못 잡는다.** 목록을 돌려주는 API는 데이터가 0건이면 루프·변환이 아예 실행되지 않아 멀쩡해 보인다.
+   집계/조회 API를 손댔으면 **데이터가 1건 이상인 계정으로 반드시 다시 호출**할 것 (2026-07-21 `GET /api/home` 500 장애의 원인)
+6. **`@Query` 에서 `CAST(x AS date)` 를 `List<LocalDate>` 로 받지 말 것.** Hibernate 가 `java.sql.Date` 를 돌려주고
+   Spring Data 가 변환하지 못해 `ConverterNotFoundException` → 500. 시각을 그대로 받아 Java 에서 `toLocalDate()` 로 바꾼다
 
 ## 어디를 읽을 것인가
 
