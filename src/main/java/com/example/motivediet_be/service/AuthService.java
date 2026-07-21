@@ -58,6 +58,7 @@ public class AuthService {
                 .queryParam("scope", GOOGLE_SCOPE)
                 .queryParam("state", state)
                 .build()
+                .encode()   // scope 두 값 사이 공백 등 쿼리값을 %20으로 인코딩 — 안 하면 생짜 공백이 URL을 깨뜨린다
                 .toUriString();
     }
 
